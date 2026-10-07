@@ -1,0 +1,124 @@
+# Modello dati — ZeroMagazzino
+
+Schema implementato nel Prompt 2, con migration aggiuntive rispetto al bootstrap. MySQL 8.0.16+ (8.4 verificato), InnoDB, `utf8mb4`, PHP a 64 bit. SQLite è disponibile per la suite rapida; MySQL resta il riferimento per il deployment.
+
+## Entità e relazioni
+
+| Tabella / Model | Responsabilità e legami |
+| --- | --- |
+| `users` / `User` | Autenticazione e ruolo; `hasOne(Retailer)` |
+| `retailers` / `Retailer` | Azienda, contatti, sede, IBAN cifrato e moderazione; `user_id` univoco, partita IVA univoca, revisore opzionale |
+| `plans` / `Plan` | Catalogo configurabile: prezzi, limiti, scambio e commissione |
+| `subscriptions` / `Subscription` | Storico piano del rivenditore, periodicità, prezzo/valuta concordati, stato e date |
+| `inventory_items` / `InventoryItem` | Offerta del rivenditore, quantità, prezzi, disponibilità logistiche, condizione e stato; coppia provider/ID prodotto esterno opzionale |
+| `inventory_images` / `InventoryImage` | Foto ordinate dell'offerta, disk/path e testo alternativo |
+| `availability_requests` / `AvailabilityRequest` | Richiesta cliente, contatto, prodotto e rivenditore destinatario |
+| `sales` / `Sale` | Ordine esterno identificato da provider/ID, stato, valuta e totale |
+| `sale_items` / `SaleItem` | Righe per rivenditore, riferimento inventario e snapshot di nome/SKU/unità, prezzo, quantità e commissione |
+| `wallet_transactions` / `WalletTransaction` | Ledger append-only, causale, importo firmato, valuta, maturazione, fonti e chiave idempotenza |
+| `payout_requests` / `PayoutRequest` | Richiesta bonifico, importo, IBAN snapshot cifrato, stato, revisore e riferimento pagamento |
+| `integration_events` / `IntegrationEvent` | Receipt durevole: provider/evento, hash del corpo originale, payload cifrato opzionale, stato e retry |
+| `audit_logs` / `AuditLog` | Attore amministrativo, azione, soggetto polimorfico e snapshot redatti; append-only |
+
+Restano le tabelle Laravel per password reset, sessioni, cache e queue. Non sono create le precedenti proposte `stock_items`, `credit_accounts`, `payout_reservations`, `external_listings` o `integration_operations`: le prime sono sostituite dalle entità sopra; un eventuale outbox per pubblicazioni sarà introdotto con il workflow di integrazione.
+
+## Stati
+
+- Rivenditore: `pending`, `approved`, `rejected`, `suspended`.
+- Inventario: `draft`, `pending`, `published`, `change_pending`, `rejected`, `archived`.
+- Condizione: `new`, `end_of_line`, `old_stock`, `damaged_packaging`.
+- Richiesta disponibilità: `new`, `contacted`, `closed`.
+- Bonifico: `pending`, `paid`, `rejected`; nessuno stato intermedio «approved».
+- Subscription: `pending`, `active`, `cancelled`, `expired`; periodicità `monthly`/`yearly`.
+- Vendita: `pending`, `paid`, `cancelled`, `partially_refunded`, `refunded` (vocabolario locale da mappare al futuro provider).
+- Evento integrazione: `pending`, `processing`, `processed`, `failed`.
+
+Enums PHP con cast Eloquent e vincoli enum nel database. I CHECK garantiscono timestamp per approvazione/rifiuto del rivenditore, pubblicazione/cambio pendente, richiesta contattata/chiusa, bonifico pagato/rifiutato ed evento elaborato. Non implementano ancora i workflow di transizione: le future Actions devono validarli e autorizzarli.
+
+## Importi e quantità esatti
+
+Tutti i prezzi, limiti monetari, totali e movimenti usano `BIGINT` firmati con suffisso `_cents`. I valori non finanziari che devono essere positivi hanno CHECK dedicati. `ExactIntegerCast` accetta solo interi PHP o stringhe intere: rifiuta float, booleani, valori decimali/esponenziali e overflow. Nessun passaggio di denaro attraverso float.
+
+Valuta `CHAR(3)` maiuscola, default EUR; validazione sintattica del codice nel cast. Il seed definisce EUR. Il saldo è sempre calcolato separatamente per valuta, senza conversione FX; le future interfacce devono limitare la scelta alle valute ISO 4217 effettivamente supportate.
+
+Commissioni in basis point: 200 = 2%, 50 = 0,5%. `MoneyMath` usa Brick Math (dipendenza esplicita), interi arbitrari per i prodotti intermedi e arrotondamento half-up al centesimo, applicato per riga/commissione. Un risultato fuori dal range degli interi supportati genera un errore, senza troncamento o conversione a float.
+
+La quantità pubblica `$item->quantity` / `$saleItem->quantity` è una stringa esatta a tre decimali. Il database conserva `quantity_milliunits`: `"1.250"` equivale a 1250 millesimi. Il setter accetta interi o stringhe con al massimo tre decimali, rifiuta float e precisione eccedente. Inventario ammette zero; una riga vendita richiede quantità positiva. `unit` indica l'unità commerciale; la sua lista sarà definita nei form futuri.
+
+`InventoryItem::inventoryValueCents()` moltiplica `zero_price_cents` per la quantità esatta. Totali ordine, IVA, spedizione e commissioni concordate non sono calcolati automaticamente al salvataggio: sono snapshot che le future Actions/importer devono validare. Cambiare il prodotto non modifica una riga vendita storica.
+
+## Piani
+
+| Piano | Mensile | Annuale | Articoli | Valore magazzino | Scambio | Commissione |
+| --- | ---: | ---: | --- | --- | --- | ---: |
+| FREE | 0 cent | 0 cent | 5 | 1.000.000 cent (10.000 €) | No | 200 bps (2%) |
+| PRO | 6.900 cent (69 €) | 49.900 cent (499 €) | Illimitati | Illimitato | Sì | 50 bps (0,5%) |
+
+`config/plans.php` definisce i valori iniziali; `PlanSeeder` crea le righe mancanti. Il database è la fonte runtime delle caratteristiche: ripetere il seed non sovrascrive personalizzazioni. `null` nei limiti significa illimitato; zero è un limite effettivo. Cambiare il config non aggiorna righe già esistenti: un aggiornamento delle caratteristiche va eseguito esplicitamente.
+
+Subscriptions multiple conservano lo storico; un indice univoco sulla colonna generata `active_retailer_id` impedisce due righe `active` per la stessa azienda. Le inattive hanno chiave generata NULL e possono essere multiple. Il cambio piano deve disattivare la precedente e attivare la nuova nella stessa transazione. Prezzo e valuta della subscription sono snapshot e non cambiano aggiornando il piano.
+
+Il seed non crea account, sottoscrizioni o inventario demo. Quote, fatturazione e criterio degli stati da conteggiare per i limiti sono responsabilità dei prossimi workflow; nessun controllo quota è ancora applicato dalle pagine placeholder.
+
+## Ledger e saldo
+
+`WalletBalance` ricostruisce tre valori, senza campi saldo aggiornabili su `retailers`:
+
+- `availableCents`: somma di tutti i movimenti maturati (`available_at` non NULL e non futuro), incluse riserve/rilasci.
+- `totalCents`: credito contabile complessivo, anche non maturato, escludendo riserve e rilasci che non consumano il credito.
+- `reservedCents`: opposto della somma maturata di `payout_reservation` e `payout_release`.
+
+| Tipo | Segno | Significato |
+| --- | --- | --- |
+| `sale_credit` | Positivo | Credito da riga vendita |
+| `commission` | Negativo | Commissione della riga vendita |
+| `refund` | Negativo | Storno/rimborso della riga vendita |
+| `payout_reservation` | Negativo | Riduzione temporanea della disponibilità |
+| `payout_release` | Positivo | Rilascio della riserva; aggiunto per distinguerlo dal rimborso di un bonifico |
+| `payout` | Negativo | Consumo effettivo del credito per pagamento |
+| `payout_reversal` | Positivo | Storno di un bonifico già contabilizzato |
+| `adjustment` | Non zero, entrambi i segni | Rettifica motivata e auditata dal futuro workflow |
+
+Esempio: credito 10.000 cent, riserva −6.000 → disponibile 4.000, totale 10.000, riservato 6.000. Al pagamento si aggiungono rilascio +6.000 e payout −6.000 nella stessa transazione: disponibile/totale 4.000, riservato zero. Al rifiuto si aggiunge soltanto il rilascio. Uno storno successivo del pagamento aggiunge `payout_reversal` +6.000.
+
+Crediti/commissioni/rimborsi richiedono una riga vendita; i quattro tipi bonifico richiedono una richiesta bonifico. Non si può riferire contemporaneamente una riga vendita e un bonifico. Una chiave idempotenza globale univoca impedisce di ripetere lo stesso effetto; ogni tipo di movimento bonifico è unico per richiesta. Rimborsi parziali distinti possono avere chiavi diverse sulla stessa riga.
+
+Un credito con `available_at = NULL` è non maturato. Se la data non era determinabile, la maturazione successiva richiede compensazione append-only del movimento pendente e nuovo movimento maturato, senza duplicare il totale. Commissione e credito relativi allo stesso incasso devono avere maturazione coerente. La finestra commerciale resta da confermare.
+
+Eloquent rifiuta modifica/cancellazione di ledger e audit; trigger DB bloccano anche UPDATE/DELETE diretti. Correzioni tramite movimenti compensativi. Questo protegge il DML ordinario, non operazioni DBA come DROP/TRUNCATE. I saldi possono diventare negativi dopo rimborsi/storni; la gestione del debito è una decisione commerciale futura.
+
+Il servizio di saldo è una lettura, non un servizio di autorizzazione o prenotazione. Per evitare overspending le future Actions devono autorizzare il rivenditore, bloccare la sua riga con `lockForUpdate()`, ricalcolare il disponibile e inserire riserva/richiesta atomicamente. Tutti gli scrittori che cambiano disponibilità devono usare lo stesso lock. Questi workflow non sono implementati in questa fase.
+
+## Vincoli e indici
+
+- `retailers.user_id` e `vat_number` univoci: un solo account titolare per profilo nella versione attuale. Normalizzazione e validazione della partita IVA saranno applicate all'ingresso del futuro form.
+- SKU univoco per rivenditore; SKU NULL ripetibile. EAN non univoco: può identificare merce disponibile presso più offerte.
+- Posizione immagine univoca per articolo. La cancellazione di immagini DB in cascata non elimina automaticamente i file storage: servirà il relativo workflow.
+- Coppia provider/ID prodotto, ordine o evento univoca; ID riga univoco nell'ordine. Identificativi esterni confrontati case-sensitive anche su MySQL.
+- Foreign key composte su richieste/righe e inventario impediscono attribuzioni a un rivenditore diverso. Le righe condividono la valuta della vendita; i riferimenti wallet condividono proprietario e valuta di riga/bonifico.
+- CHECK su importi, quantità, percentuali, segni, riferimenti obbligatori, date e coppia provider/prodotto. MySQL usa CHECK reali; SQLite usa trigger equivalenti per validare INSERT/UPDATE, oltre agli enum e alle FK. SQLite controlla anche il tipo di storage integer per evitare l'affinità REAL.
+- Indici su ownership/stato, code amministrative, maturazione wallet e retry eventi. FK restrittive su dati finanziari e audit; nessuna cancellazione in cascata dei movimenti.
+
+## Sicurezza, audit e integrazioni
+
+`iban` di rivenditore e bonifico usa il cast `encrypted` e non viene serializzato. Payload integrazione `encrypted:array`, anch'esso nascosto; hash SHA-256 del corpo originale fornito dall'intake futuro, non ricalcolato dal payload normalizzato. Non rigenerare APP_KEY senza una procedura di rotazione dei dati cifrati.
+
+Le Policies di lettura separano proprietà e ruolo. Un rivenditore può vedere solo le proprie risorse e righe vendita; l'intero ordine multi-rivenditore, gli eventi integrazione e gli audit sono riservati all'amministratore. Nessuna nuova route espone questi dati. I servizi interni presuppongono l'autorizzazione nel chiamante; le future liste devono filtrare per owner e le future modifiche richiedono nuove capacità Policy esplicite.
+
+`RecordAdministrativeAction` verifica il ruolo amministratore, registra attore/azione/soggetto e conserva soltanto campi di stato ammessi, scartando payload annidati, float, IBAN e secrets. Deve essere chiamato nella stessa transazione della futura azione amministrativa; non esistono ancora endpoint di approvazione o pagamento da collegare automaticamente.
+
+Receipt univoche ed effetti wallet univoci forniscono le primitive di idempotenza, non un'integrazione attiva. Verifica firma, gestione eventi fuori ordine, job, retry e riconciliazione saranno implementati con l'adapter. Nessuno Stripe/ecommerce reale è incluso.
+
+Per creare i trigger MySQL con binary logging attivo può essere necessario un utente di deployment con privilegi appropriati. Il container Compose è solo di sviluppo e usa `--skip-log-bin`, senza assegnare SUPER all'utente applicativo. In produzione mantenere la strategia di replica/PITR e usare il canale di migration autorizzato; non rimuovere i trigger per far passare il deploy.
+
+## Seed, factory e verifica
+
+```sh
+php artisan migrate
+php artisan db:seed --class=PlanSeeder
+php artisan test
+```
+
+Factory per tutti i modelli, con stati rappresentativi (approved/rejected, published, active, contacted/closed, paid/rejected, processed, saleCredit/reservation). Dati demo soltanto tramite factory esplicite, mai seed automatico di account.
+
+La stessa suite va eseguita su un database MySQL di test dedicato (istruzioni nel README). Test su relazioni, enum, snapshot, seed, precisione/overflow, saldo/maturazione/riserve, ownership Policy e FK, unicità/idempotenza, immutabilità e cifratura. Nessun test usa servizi Stripe/ecommerce reali.

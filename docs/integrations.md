@@ -1,0 +1,57 @@
+# Integrazioni
+
+## Confine ecommerce
+
+Il negozio è un sistema esterno: gestisce vetrina pubblica, carrello, checkout e pagamento cliente. ZeroMagazzino gestisce aziende, moderazione, giacenze e pubblicabilità, rappresentazione vendite, richieste e credito.
+
+Introdurre un unico contratto applicativo `EcommerceGateway`, con adapter del provider scelto e fake per i test. Modelli e controller non dipendono da SDK o payload del provider. Aggiungere solo operazioni realmente richieste: pubblicare/aggiornare offerta approvata, ritirarla, sincronizzare disponibilità e recuperare vendite per riconciliazione quando supportato.
+
+DTO semplici traducono dati locali in payload e risposte normalizzate. ID esterni, mapping e stato di sincronizzazione restano nella coppia `external_provider`/`external_product_id` di `inventory_items` nella versione attuale; il provider configurato si risolve tramite container Laravel. Nessuna implementazione adapter in questa fase.
+
+## Fonte autorevole
+
+| Informazione | Responsabilità proposta |
+| --- | --- |
+| Azienda, moderazione, offerta approvata | Gestionale |
+| Ordine e pagamento cliente | Negozio/provider |
+| Credito e bonifici rivenditore | Registro del gestionale, alimentato da eventi verificati |
+| Disponibilità e prenotazioni durante checkout | Da concordare con il provider prima delle vendite reali |
+
+L'aggiornamento stock asincrono non garantisce assenza di overselling. Confermare supporto del provider a prenotazioni, quantità, ordine degli eventi e aggiornamenti condizionali; documentare il comportamento quando tali capacità mancano.
+
+## Pubblicazione e resilienza
+
+Approvazione registra un'operazione persistente nella stessa transazione; dopo commit un job invoca l'adapter. Scheduler recupera operazioni pendenti, worker esegue retry limitati con backoff, timeout e tracciamento redatto. Errori permanenti richiedono intervento amministrativo.
+
+Chiavi idempotenza stabili per risorsa/versione e ID remoti persistiti. Se la risposta è persa dopo un successo remoto, verificare l'esistenza tramite identificatore esterno prima di ricreare. Se il provider non consente deduplicazione o ricerca, segnalare esito incerto e riconciliare manualmente: non garantire effetti «exactly once» senza supporto.
+
+## Webhook in ingresso
+
+1. Limitare dimensione richiesta; verificare firma sul corpo raw e timestamp secondo specifica ufficiale del provider, prima di usare il payload.
+2. Validare schema e identificativi; inserire receipt con vincolo unico `(provider, external_event_id)`. Duplicati già acquisiti ricevono risposta idempotente.
+3. Rispondere positivamente solo dopo acquisizione durevole; elaborare tramite job. Receipt e scanner consentono recupero se dispatch o worker fallisce.
+4. Applicare aggiornamenti vendita/stock/credito in transazione con chiavi univoche per gli effetti. Non marcare evento completato prima del commit.
+5. Gestire eventi fuori ordine con versione/timestamp affidabile o recupero dello stato remoto; non fare regredire un ordine per un evento vecchio.
+6. Riconciliare periodicamente ordini e pubblicazioni se API disponibili; rendere visibili eventi falliti e retry.
+
+Firma, algoritmo, header, tolleranza temporale e rotazione dipendono dal provider; non inventare un protocollo universale. Una allowlist IP eventuale è difesa aggiuntiva, non sostituisce la firma. I job ritentati non devono produrre doppi crediti.
+
+## Richieste disponibilità
+
+Validare prodotto pubblicato, destinatario derivato dal prodotto e contatto. Rate limit e protezione antiabuso; non fidarsi di `retailer_id` inviato dal client. Se trasmesse dal negozio, autenticare il canale con firma/API secondo contratto. Confermare luogo del form e canale di notifica prima dell'implementazione.
+
+## Configurazione e secrets
+
+Configurare tramite `.env` e file `config/*`: provider, URL base, credenziali API, webhook secret, timeout e code. URL base controllato in configurazione, mai destinazione arbitraria fornita dal cliente. Verifica TLS sempre attiva.
+
+Nessun secret reale nei documenti, log o `.env.example`. Stripe non è un requisito attuale: aggiungerlo solo se scelto per i piani o altro flusso esplicitamente definito. Bonifici inizialmente intesi come richieste/revisione amministrativa; non presumere API bancaria o esecuzione automatica.
+
+## Decisioni e test prima del rilascio
+
+Confermare provider e sandbox, limiti API, autenticazione, firma webhook, idempotenza, mapping prodotti/varianti, modello ordini multi-rivenditore, tasse/commissioni, rimborsi e politica stock. Testare adapter con fake, payload firmati, firma errata, duplicati, ordine eventi, timeout, risposta persa, rate limit e riconciliazione. Eseguire contract test nella sandbox del provider prima di dichiarare l'integrazione pronta.
+
+## Primitive disponibili (Prompt 2)
+
+`integration_events` contiene receipt univoche per provider/evento, con hash raw, payload cifrato opzionale e stato di elaborazione. `wallet_transactions.idempotency_key` impedisce effetti finanziari duplicati. Sono soltanto primitive dati: la firma webhook, l'intake transazionale e i worker non sono ancora implementati.
+
+Nel vocabolario inventario richiesto, `published` deve rappresentare la pubblicazione completata; il futuro adapter deve distinguere approvazione locale, conferma remota e fallimento attraverso il workflow e lo stato dell'operazione di integrazione. La tabella outbox `integration_operations` proposta sopra non è ancora creata. Per modifiche `change_pending` resta da definire una versione approvata immutabile o il ritiro dell'offerta precedente.

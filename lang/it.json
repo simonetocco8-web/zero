@@ -1,0 +1,11 @@
+{
+    "Hello!": "Ciao!",
+    "Regards,": "A presto,",
+    "Reset Password Notification": "Reimposta la password",
+    "You are receiving this email because we received a password reset request for your account.": "Ricevi questa email perché è stato richiesto il recupero della password per il tuo account.",
+    "Reset Password": "Reimposta password",
+    "This password reset link will expire in :count minutes.": "Il link scade tra :count minuti.",
+    "If you did not request a password reset, no further action is required.": "Se non hai richiesto il recupero della password, puoi ignorare questa email.",
+    "If you're having trouble clicking the \":actionText\" button, copy and paste the URL below\ninto your web browser:": "Se il pulsante \":actionText\" non funziona, copia e incolla questo indirizzo nel browser:",
+    "All rights reserved.": "Tutti i diritti riservati."
+}

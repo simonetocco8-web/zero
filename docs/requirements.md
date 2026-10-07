@@ -1,0 +1,50 @@
+# Requisiti di ZeroMagazzino
+
+## Stato iniziale e ambito
+
+Analisi del 6 ottobre 2026: checkout con `README.md` e `textElimina.txt`, entrambi contenenti `Test`; nessuna applicazione, dipendenza, migration, CI o suite di test. Nell'ambiente osservato sono assenti PHP, Composer e client MySQL; Node.js è disponibile (24.19.0). La compatibilità del runtime Laravel e la disponibilità del server MySQL devono essere verificate nella successiva inizializzazione.
+
+Questa fase produce esclusivamente documentazione e regole. Il prodotto è un gestionale web B2B che collega rivenditori con giacenze edili a clienti interessati. Catalogo pubblico, checkout e pagamento del cliente restano nel negozio esterno.
+
+## Attori e capacità
+
+| Attore | Capacità previste |
+| --- | --- |
+| Rivenditore | Registrare azienda, scegliere piano, attendere verifica, gestire profilo e giacenze, inviare giacenze in approvazione, consultare richieste e vendite, visualizzare credito e richiedere bonifico |
+| Amministratore | Approvare/rifiutare rivenditori e giacenze, pubblicare prodotti sul negozio, gestire richieste di bonifico, supervisionare piattaforma |
+| Cliente | Consultare prodotti approvati e acquistare nel negozio esterno; inviare richiesta di disponibilità riferita a un prodotto |
+
+Il cliente non richiede inizialmente un account nel gestionale. La posizione del form di disponibilità (negozio o endpoint del gestionale) resta da definire; in entrambi i casi validazione, consenso/privacy applicabile e protezione antiabuso sono necessari.
+
+## Flussi e criteri di accettazione futuri
+
+1. Registrazione: azienda e referente salvati, piano selezionato, stato in attesa; solo l'amministratore può approvare o rifiutare con motivazione. Un rivenditore non approvato non può inviare giacenze alla pubblicazione.
+2. Giacenze: il proprietario crea bozze e foto, poi invia alla verifica. Solo giacenze approvate possono essere esportate. Un rifiuto deve mostrare motivazione e consentire correzione/reinvio.
+3. Pubblicazione: approvazione locale e conferma remota sono stati distinti; errori e retry sono visibili. Il rivenditore non può forzare pubblicazione o autoapprovazione.
+4. Richieste: riferite a un prodotto e al rivenditore competente; altri rivenditori non possono leggerle. Non costituiscono un ordine o una prenotazione automatica.
+5. Vendite: eventi autenticati del negozio generano una rappresentazione locale di ordine e righe; duplicati non duplicano vendite, stock o credito. Gestire annullamenti e rimborsi secondo regole da confermare.
+6. Credito: saldo derivato da movimenti tracciabili, con distinzione tra maturato, disponibile e riservato. La disponibilità dipende da una regola di maturazione esplicita.
+7. Bonifico: richiesta ammessa solo entro il saldo disponibile, importo riservato atomicamente, revisione amministrativa e conferma dell'effettivo pagamento. Un'approvazione non equivale al trasferimento bancario.
+
+## Requisiti trasversali
+
+- Separazione dei dati per rivenditore, audit delle azioni sensibili, sicurezza descritta in `../AGENTS.md`.
+- Mobile-first, accessibilità e feedback secondo `ui-ux.md`.
+- Integrazione asincrona, osservabile e sostituibile secondo `integrations.md`.
+- Nessuna promessa di consistenza immediata tra gestionale e negozio; mostrare stato e timestamp di sincronizzazione.
+- Nessun pagamento, abbonamento Stripe o bonifico automatico da implementare prima della definizione delle relative regole.
+
+## Assunzioni da confermare
+
+- Nella versione attuale un profilo rivenditore appartiene a un solo utente e un utente può avere un solo profilo, come stabilito nel Prompt 2. Eventuali utenti aziendali aggiuntivi richiederanno un'estensione esplicita.
+- EUR come valuta iniziale, con valuta comunque memorizzata; quantità anche frazionarie per materiali venduti a metri, peso o superficie.
+- Una vendita può contenere righe di rivenditori diversi, con credito attribuito a ciascuna riga.
+- Approvazione per giacenza/offerta del rivenditore; catalogo comune deduplicato non richiesto inizialmente.
+
+## Decisioni ancora aperte
+
+Provider ecommerce, API/webhook disponibili, titolare della vendita e incasso, gestione IVA/fatture, piani e pagamento dei piani, commissioni, spedizione/ritiro, resi e contestazioni, finestra di maturazione credito, soglie bonifico, verifica azienda e coordinate bancarie, stock autorevole e prenotazioni, conservazione dati e notifiche. Queste decisioni precedono le funzionalità coinvolte; non bloccano questa documentazione.
+
+## Modello implementato (Prompt 2)
+
+Schema, enum, relazioni, factory e piani FREE/PRO sono implementati secondo `database.md`. Le schermate rimangono placeholder. I limiti dei piani sono memorizzati e configurabili; enforcement delle quote, moderazione, prenotazioni di credito e pagamento sono workflow futuri.
