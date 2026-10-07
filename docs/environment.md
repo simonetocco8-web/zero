@@ -104,3 +104,7 @@ CACHE_STORE deve consentire lock condivisi Stripe e cache restart dei worker. Pe
 | CREDIT_MATURATION_DAYS | Giorni prima che il credito sia disponibile; default 0, da confermare nel processo commerciale |
 
 Nessun prezzo, commissione o limite piano si configura con nuovi env sparsi: usare config/plans.php per seed iniziale e righe plans per configurazione runtime. Il cambio di piano non riscrive commissioni già registrate.
+
+## Prima installazione manuale senza CLI
+
+`ZERO_INSTALL_TOKEN`: token temporaneo casuale (consigliati 32 byte), letto direttamente da environment/`.env` dall’installer indipendente dal routing. Assente/vuoto disabilita l’installer con 404. Non è memorizzato nella cache config Laravel. Inviare soltanto via POST HTTPS, eliminare il token e `public/install-zero.php` dopo il successo; procedura in [cpanel-no-ssh-deployment.md](cpanel-no-ssh-deployment.md).

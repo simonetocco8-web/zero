@@ -2,6 +2,8 @@
 
 Questa è una procedura da revisionare ed eseguire sul server scelto, non un deployment automatico. Nessun comando di questa guida è stato eseguito contro produzione. Preparare prima staging, backup e piano di ripristino; usare gli stessi pacchetti fissati nei lockfile e gli asset della stessa release.
 
+Per hosting senza SSH/Terminale vedere la [procedura File Manager e installer temporaneo](cpanel-no-ssh-deployment.md). Questa guida mantiene i comandi per server con CLI o interventi del provider.
+
 ## Requisiti e hosting compatibile
 
 PHP >= 8.4.1 su web e CLI, Composer 2, MySQL >= 8.0.16 (consigliato 8.4), CHECK e trigger abilitati. Estensioni e ImageMagick JPEG/PNG/WebP sono elencati nel README; `proc_open` non deve essere disabilitato; la CLI worker deve avere pcntl per applicare i timeout. Richiesti accesso SSH/Terminal, cron ogni minuto, processi worker o una modalità bounded equivalente, storage privato persistente, TLS e SMTP/API mail configurabile. Se l’hosting impedisce questi requisiti, non è compatibile con il rilascio corrente.

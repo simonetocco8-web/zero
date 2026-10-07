@@ -45,7 +45,13 @@ SQLite è una verifica rapida; 6 casi MySQL (2 inventario, 3 finanza, 1 Checkout
 | Configurazione di distribuzione | DeploymentReadinessTest: bootstrap del template, null/default queue, retry superiore al lease, mailer log inizializzabile, storage privato, cifratura valida senza servizi esterni e comandi recovery registrati nello scheduler |
 | Design system e regressioni audit | DesignSystemTest e SecurityUxAuditTest: pagine private, XSS, modal con errore, checkbox old input, throttle, date inclusive, latest relation e log redatti |
 
-Tutti i test applicativi sono in `tests/Feature`. I 21 file di test sono: i 6 Auth sopra indicati, AdminPanelTest, AvailabilityFlowTest, BillingConcurrencyTest, DeploymentReadinessTest, DesignSystemTest, DomainModelTest, ExternalIntegrationsTest, FinanceConcurrencyTest, InventoryConcurrencyTest, InventoryFlowTest, RetailerFlowTest, SaleAccountingTest, SecurityUxAuditTest, SmokeTest e StripeSdkGatewayTest. Tests/TestCase.php è la base, non un test aggiuntivo.
+Tutti i test applicativi sono in `tests/Feature`. I 23 file di test sono: i 6 Auth sopra indicati, AdminPanelTest, AvailabilityFlowTest, BillingConcurrencyTest, DeploymentReadinessTest, DeployPackageTest, ManualDeploymentTest, DesignSystemTest, DomainModelTest, ExternalIntegrationsTest, FinanceConcurrencyTest, InventoryConcurrencyTest, InventoryFlowTest, RetailerFlowTest, SaleAccountingTest, SecurityUxAuditTest, SmokeTest e StripeSdkGatewayTest. Tests/TestCase.php è la base, non un test aggiuntivo.
+
+## Pacchetto manuale e installer temporaneo
+
+`DeployPackageTest` verifica file necessari e rimozione di secrets/cache/upload/test dalla release. `ManualDeploymentTest` esercita il vero script via server HTTP isolato: token assente/vuoto/errato, GET, HTTPS, lock concorrente, marker, APP_KEY invalida, errore DB senza dettagli, preservazione DB esistente e installazione completa con PlanSeeder/cache. Testa anche il generatore locale di chiave/token. Richiesti `bash`, `tar`, `zip`, `unzip` per il test del pacchetto (disponibili nel runner Ubuntu).
+
+Il workflow manuale `.github/workflows/build-deploy-package.yml` installa solo dipendenze di produzione e pubblica lo ZIP come artifact; non esegue deployment. Procedura in [cpanel-no-ssh-deployment.md](cpanel-no-ssh-deployment.md).
 
 ## CI GitHub Actions
 
