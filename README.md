@@ -112,3 +112,17 @@ Dettagli in [docs/database.md](docs/database.md). Importi `_cents` interi, perce
 FREE: 5 articoli, 10.000 € di magazzino, niente scambio, commissione 2%. PRO: 69 €/mese o 499 €/anno, limiti NULL (illimitati), scambio e commissione 0,5%. I default sono in `config/plans.php`; il runtime legge le righe `plans`. Le quote non sono ancora applicate nei placeholder.
 
 Il ledger e gli audit sono append-only anche a livello DB. Il deploy delle nuove migration richiede CHECK supportati (MySQL 8.0.16+) e privilegi per i trigger; non omettere la migration dei vincoli. I test su MySQL devono continuare a usare il database dedicato, mai quello applicativo.
+
+### Foto delle giacenze
+
+Il runtime richiede ImageMagick con supporto JPG/PNG/WebP (`convert`, configurabile con `INVENTORY_IMAGE_BINARY`). Configurare PHP: `upload_max_filesize=15M`, `post_max_size=128M`, `max_file_uploads=8`; reverse proxy deve accettare lo stesso totale. Nel runtime cloud questi valori sono già applicati a `/workspace/runtime/php.ini`. Nessun `storage:link` è necessario per le foto: rimangono private e sono lette tramite route autorizzata.
+
+Dopo aggiornamenti eseguire `php artisan migrate`; la migration del Prompt 4 aggiunge i campi proposta senza alterare i dati esistenti. Test MySQL includono due processi concorrenti per le quote articolo/valore; su SQLite quei due test sono saltati esplicitamente.
+
+### Pannello amministratore e negozio simulato
+
+Solo utenti autenticati con ruolo admin possono vedere/gestire rivenditori, giacenze e bonifici. Non esistono password amministrative predefinite. Liste filtrabili e paginate, conferme prima delle azioni, audit consultabile nella dashboard. PRO mostra pagamento non verificato fino a un’integrazione reale.
+
+La pubblicazione usa esclusivamente `FakeStoreGateway`; `store_publications` registra snapshot, stato e risultato e `fake_store_products` il catalogo simulato. Per recuperare simulazioni interrotte/fallite: `php artisan store:sync`. Il gateway non effettua richieste di rete. Eseguire le nuove migration prima di avviare l’app.
+
+Segnare un bonifico come pagato richiede la riserva coerente nel ledger e il riferimento di una disposizione bancaria già eseguita esternamente. La creazione delle richieste dal rivenditore resta una fase successiva.

@@ -26,7 +26,7 @@ class RecordAdministrativeAction
         if (! $subject instanceof $expected || ! $subject->exists) {
             throw new InvalidArgumentException('Administrative action requires a persisted subject of the matching type.');
         }
-        $allowed = ['status', 'approved_at', 'rejected_at', 'published_at', 'paid_at', 'amount_cents', 'currency'];
+        $allowed = ['status', 'approved_at', 'rejected_at', 'published_at', 'paid_at', 'amount_cents', 'currency', 'external_provider', 'external_product_id'];
 
         return AuditLog::create([
             'actor_user_id' => $actor->getKey(),

@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
+use App\Models\Retailer;
 use App\Models\User;
+use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -30,10 +32,11 @@ class SmokeTest extends TestCase
 
     public function test_retailer_can_render_all_retailer_placeholders(): void
     {
-        $this->actingAs(User::factory()->create());
+        $retailer = Retailer::factory()->approved()->create();
+        $this->actingAs($retailer->user);
         $this->get(route('dashboard'))->assertRedirect(route('retailer.dashboard'));
         foreach (config('navigation.retailer') as $link) {
-            $this->get(route($link['route']))->assertOk()->assertSee($link['label'])->assertSee('In preparazione');
+            $this->get(route($link['route']))->assertOk()->assertSee($link['label']);
         }
     }
 
@@ -42,7 +45,7 @@ class SmokeTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => UserRole::Admin]));
         $this->get(route('dashboard'))->assertRedirect(route('admin.dashboard'));
         foreach (config('navigation.admin') as $link) {
-            $this->get(route($link['route']))->assertOk()->assertSee($link['label'])->assertSee('In preparazione');
+            $this->get(route($link['route']))->assertOk()->assertSee($link['label']);
         }
     }
 
@@ -64,8 +67,9 @@ class SmokeTest extends TestCase
 
     public function test_registration_cannot_assign_admin_role(): void
     {
+        $this->seed(PlanSeeder::class);
         $this->post(route('register'), [
-            'name' => 'Retailer',
+            'company_name' => 'Retailer', 'vat_number' => '12345678901', 'city' => 'Roma', 'plan_code' => 'free',
             'email' => 'retailer@example.test',
             'password' => 'a-test-password',
             'password_confirmation' => 'a-test-password',
