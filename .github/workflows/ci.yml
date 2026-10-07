@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: PHP 8.4 / MySQL 8.4 / Node 24
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+        env:
+          # Database sacrificabile del solo runner: nessuna password o secret reale.
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_ROOT_HOST: "%"
+          MYSQL_DATABASE: zeromagazzino_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1 --user=root"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_DATABASE: zeromagazzino_test
+      DB_USERNAME: root
+      DB_PASSWORD: ""
+      DB_URL: ""
+      SESSION_DRIVER: array
+      CACHE_STORE: array
+      MAIL_MAILER: array
+      QUEUE_CONNECTION: sync
+      STORE_DRIVER: fake
+      STRIPE_KEY: ""
+      STRIPE_SECRET: ""
+      STRIPE_WEBHOOK_SECRET: ""
+      STRIPE_PRO_MONTHLY_PRICE_ID: ""
+      STRIPE_PRO_YEARLY_PRICE_ID: ""
+      STORE_WEBHOOK_SECRET: ""
+      INVENTORY_IMAGE_BINARY: /usr/bin/convert
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: PHP e Composer
+        uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: "8.4"
+          extensions: bcmath, ctype, curl, dom, fileinfo, filter, intl, mbstring, openssl, pcntl, pdo_mysql, pdo_sqlite, session, sqlite3, tokenizer, xml, xmlwriter, zip
+          tools: composer:2
+          coverage: none
+          ini-values: upload_max_filesize=15M, post_max_size=128M, max_file_uploads=8, memory_limit=512M
+      - name: ImageMagick per i test upload
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends imagemagick
+          convert -list format | awk '/JPEG|PNG|WEBP/'
+      - name: Validazione e installazione PHP dal lockfile
+        run: |
+          composer validate --strict
+          composer install --prefer-dist --no-interaction --no-progress
+          composer check-platform-reqs
+      - name: Ambiente temporaneo e chiave solo CI
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force --no-interaction
+      - name: Formatter su tutto il progetto
+        run: vendor/bin/pint --test
+      - name: Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Installazione frontend e build
+        run: |
+          npm ci
+          npm run build
+      - name: Suite MySQL con concorrenza
+        run: php artisan test --compact --no-ansi
+      - name: Suite SQLite
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+        run: php artisan test --compact --no-ansi
+      - name: Verifica cache di rilascio e scheduler
+        run: |
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+          php artisan schedule:list
+          php artisan config:clear
+          php artisan route:clear
+          php artisan view:clear

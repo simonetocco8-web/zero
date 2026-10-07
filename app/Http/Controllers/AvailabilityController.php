@@ -39,6 +39,6 @@ class AvailabilityController extends Controller
     {
         $action->handle($request->user(), $availabilityRequest, $request->validated('status'));
 
-        return to_route('retailer.requests')->with('status','Stato della richiesta aggiornato.');
+        return to_route('retailer.requests')->with('status', 'Stato della richiesta aggiornato.');
     }
 }

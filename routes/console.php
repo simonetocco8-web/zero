@@ -63,5 +63,6 @@ Artisan::command('billing:sync', function () {
     $this->info("Riconciliazioni accodate: $count");
 });
 
+Schedule::command('store:sync')->everyMinute()->withoutOverlapping();
 Schedule::command('integrations:retry')->everyMinute()->withoutOverlapping();
 Schedule::command('billing:sync')->hourly()->withoutOverlapping();
