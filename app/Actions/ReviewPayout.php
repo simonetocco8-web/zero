@@ -6,6 +6,7 @@ use App\Enums\AdministrativeAction;
 use App\Models\PayoutRequest;
 use App\Models\Retailer;
 use App\Models\User;
+use App\Services\WalletBalance;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -15,6 +16,9 @@ class ReviewPayout
     public function handle(User $actor, PayoutRequest $payout, string $decision, ?string $reason, ?string $reference): void
     {
         Gate::forUser($actor)->authorize('review', $payout);
+        if (! in_array($decision, ['paid', 'rejected'], true)) {
+            throw ValidationException::withMessages(['decision' => 'Decisione non valida.']);
+        }
         DB::transaction(function () use ($actor, $payout, $decision, $reason, $reference) {
             $retailer = Retailer::lockForUpdate()->findOrFail($payout->retailer_id);
             $payout = PayoutRequest::lockForUpdate()->findOrFail($payout->id);
@@ -30,6 +34,9 @@ class ReviewPayout
             }
             if ($decision === 'paid' && (! $reservation || ! $payout->iban)) {
                 throw ValidationException::withMessages(['decision' => 'Servono IBAN e riserva valida prima di registrare il pagamento.']);
+            }
+            if ($decision === 'paid' && app(WalletBalance::class)->availableCentsLocked($retailer, $payout->currency) < 0) {
+                throw ValidationException::withMessages(['decision' => 'Credito insufficiente dopo i rimborsi: rifiutare il bonifico per rilasciare la riserva.']);
             }
             $before = ['status' => 'pending', 'amount_cents' => $payout->amount_cents, 'currency' => $payout->currency];
             if ($reservation) {

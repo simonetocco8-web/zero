@@ -24,6 +24,8 @@ class SaleItemFactory extends Factory
             'line_total_cents' => 2500,
             'commission_basis_points' => 200,
             'commission_cents' => 50,
+            'discount_cents' => 0,
+            'net_cents' => fn (array $attributes) => $attributes['line_total_cents'] - $attributes['commission_cents'],
         ];
     }
 }

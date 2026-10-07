@@ -17,6 +17,6 @@ class RetailerDashboard
             $value = $value->plus($item->inventoryValueCents());
         }
 
-        return ['retailer' => $retailer, 'subscription' => $subscription, 'requested' => $requested, 'plan' => $subscription?->plan, 'productCount' => (clone $items)->count(), 'inventoryValue' => $value->toInt(), 'credit' => app(WalletBalance::class)->availableCents($retailer), 'recentRequests' => $retailer->availabilityRequests()->with('inventoryItem')->latest()->limit(5)->get()];
+        return ['retailer' => $retailer, 'subscription' => $subscription, 'requested' => $requested, 'plan' => $subscription?->plan, 'productCount' => (clone $items)->count(), 'inventoryValue' => $value->toInt(), 'credit' => app(WalletBalance::class)->availableCents($retailer), 'newRequestCount' => $retailer->availabilityRequests()->where('status', 'new')->count(), 'recentRequests' => $retailer->availabilityRequests()->with('inventoryItem')->latest()->limit(5)->get()];
     }
 }

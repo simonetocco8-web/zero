@@ -85,3 +85,11 @@ Amministratore: elenco a card paginato, approvazione/rifiuto dei soli profili pe
 Accesso tramite auth + UserPolicy/accessAdministration, con Policy anche sulle azioni. Dashboard con conteggi e audit recente. Elenchi rivenditori/giacenze/bonifici a card responsive, paginazione server-side da 15 record e filtri validati per stato/azienda/intervallo data. Filtri conservati nella paginazione; nessun per_page arbitrario. Conferma tramite dialog nativo/Alpine, motivazioni obbligatorie per rifiuto/sospensione.
 
 ReviewRetailer gestisce anche approved→suspended; ReviewPayout registra esclusivamente esito di operazioni bancarie esterne e ledger. ReviewInventoryItem produce un’operazione durevole verso il gateway fittizio, elaborata fuori dalla transazione; dettagli in integrations.md. Audit include attore, tipo/ID entità, timestamp e snapshot essenziali, escludendo dati bancari e secrets.
+
+## Servizi economici (Prompt 7)
+
+SaleAccounting::recordSale e ::refund sono ingressi interni per adapter fidati. Validano e normalizzano importi/quantità/identificativi, acquisiscono receipt idempotenti, applicano transazioni e lock e scrivono snapshot/ledger. Non sono endpoint pubblici e non chiamano provider. Firma webhook e mapping saranno responsabilità del futuro adapter prima dell’invocazione.
+
+RequestPayout applica Policy, controllo stato sotto lock, validazione IBAN, unicità pending e saldo corrente; crea richiesta e riserva nello stesso commit. ReviewPayout conserva audit amministrativo, rilascia riserve e registra il pagamento esterno solo con copertura sufficiente. WalletBalance separa disponibile, netto maturato e riservato. CreditController espone esclusivamente dati derivati dal rivenditore autenticato; Form Request rifiuta selezione client di proprietario, importo, valuta o IBAN.
+
+Le operazioni economiche non modificano le giacenze: la fonte autorevole dello stock e il comportamento dei resi devono essere concordati col negozio. Prima di integrare provider reali, definire maturazione, tasse/commissioni, dati fiscali, riconciliazione, eventi fuori ordine e gestione debiti.

@@ -40,7 +40,7 @@ class ReviewInventoryItem
                         $item->images()->create($photo + ['position' => $position]);
                     }
                 }
-                $publication = StorePublication::create(['inventory_item_id' => $item->id, 'requested_by' => $actor->id, 'operation' => $item->external_product_id ? 'update' : 'create', 'payload' => Arr::only($data, ['name', 'brand', 'category', 'sku', 'ean', 'quantity_milliunits', 'unit', 'currency', 'list_price_cents', 'zero_price_cents', 'condition', 'province', 'pickup_available', 'shipping_available', 'exchange_available', 'description']) + ['images' => $item->images()->get(['disk', 'path', 'position'])->toArray()]]);
+                $publication = StorePublication::create(['inventory_item_id' => $item->id, 'requested_by' => $actor->id, 'operation' => $item->external_product_id ? 'update' : 'create', 'payload' => Arr::only($data, ['name', 'brand', 'category', 'sku', 'ean', 'quantity_milliunits', 'unit', 'currency', 'list_price_cents', 'zero_price_cents', 'condition', 'province', 'pickup_available', 'shipping_available', 'exchange_available', 'description']) + ['availability_request_url' => route('availability.create', $item), 'images' => $item->images()->get(['disk', 'path', 'position'])->toArray()]]);
                 $publicationId = $publication->id;
                 $item->status = 'published';
                 $item->published_at ??= now();

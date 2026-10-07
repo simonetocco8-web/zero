@@ -15,7 +15,7 @@ class AvailabilityRequestFactory extends Factory
         return [
             'inventory_item_id' => InventoryItem::factory(),
             'retailer_id' => fn (array $attributes) => InventoryItem::findOrFail($attributes['inventory_item_id'])->retailer_id,
-            'customer_name' => fake()->name(),
+            'quantity_milliunits' => 1000, 'privacy_accepted_at' => now(), 'privacy_policy_version' => 'availability-v1', 'customer_name' => fake()->name(),
             'customer_email' => fake()->safeEmail(),
             'message' => 'Richiesta di disponibilità di esempio.',
             'status' => AvailabilityRequestStatus::New,

@@ -58,3 +58,25 @@ Il profilo modifica esclusivamente i dati aziendali validati del proprietario, s
 Dashboard con dati del solo proprietario: piano attivo/richiesto, commissione del piano attivo, numero/valore delle giacenze EUR non archiviate, ultime cinque richieste e credito disponibile dal ledger. Somme e formattazione monetaria senza float.
 
 Amministratore: elenco a card paginato, approvazione/rifiuto dei soli profili pending; rifiuto con motivazione obbligatoria. Action con lock, transazione, Policy e audit append-only; revisione duplicata rifiutata. Nessuna modifica al pagamento/attivazione subscription. Reinvio di iscrizioni rifiutate e sospensione sono fasi successive.
+
+## Richieste di disponibilità (Prompt 6)
+
+Form pubblico GET/POST `/products/{item}/request`, senza autenticazione ma con sessione e CSRF. Il negozio può collegare questa URL, inclusa nei nuovi snapshot gateway come availability_request_url; usare un link alla pagina, senza disabilitare CSRF per POST cross-origin. Nessuna API di raccolta pubblica o esposizione dei contatti.
+
+Disponibile solo per published/change_pending con published_at e rivenditore approved; anche change_pending usa esclusivamente la versione approvata. POST ricontrolla prodotto/rivenditore sotto lock, ricava l’ownership dal database, forza stato new e data consenso server-side. Richiesta non equivale ad acquisto o prenotazione e può chiedere più della quantità esposta.
+
+Campi aggiunti: customer_company, quantity_milliunits interi, privacy_accepted_at e privacy_policy_version. I record storici mantengono null per quantità/consenso, senza inventare evidenze retroattive. Quantità strettamente positiva, fino a tre decimali; nome/email obbligatori; campi testo senza markup e con limiti di lunghezza; Blade esegue escaping. Honeypot contact_website obbligatoriamente vuoto; 5 POST/minuto e 20/ora per IP, condivisi fra prodotti, includendo tentativi non validi. Nessun IP memorizzato nella richiesta. Configurare trusted proxy solo quando verificato dal deployment.
+
+Privacy: consenso obbligatorio e versione dell’informativa configurabile tramite PRIVACY_POLICY_VERSION. PRIVACY_POLICY_URL sostituisce la pagina informativa interna: l’informativa definitiva deve indicare identità del titolare, recapiti, conservazione e diritti per il deployment effettivo. Dati personali nascosti dalla serializzazione generica, consultabili solo nella lista autenticata del proprietario; header private/no-store. Nessuna comunicazione o marketing automatico.
+
+Pagina rivenditore paginata da 15 richieste, card mobile e tabella desktop; modifica consentita soltanto allo stato (new/contacted/closed) con Policy, middleware, CSRF e lock. Timestamp contatto conservato come storico; chiusura impostata entrando in closed e rimossa riaprendo. Dashboard conta richieste nuove e mostra le ultime cinque del solo proprietario.
+
+## Dominio economico implementato (Prompt 7)
+
+Vendite confermate normalizzate in EUR tramite SaleAccounting, senza ecommerce reale. Lordo = prezzo unitario × quantità, arrotondato HalfUp al centesimo, meno sconto riga. Commissione dal piano valido al timestamp della vendita; percentuale in basis point, commissione e netto salvati su ogni riga. Cambio piano e replay non ricalcolano le righe esistenti.
+
+Rimborsi totali/parziali con identificativo esterno stabile: restituiscono proporzionalmente anche la commissione. Il calcolo cumulativo elimina scarti fra più rimborsi; non è possibile rimborsare più del lordo originale. Movimenti originali conservati, nessun aggiornamento o cancellazione del ledger.
+
+Pagina Credito: disponibile, netto maturato storico (al netto dei rimborsi, indipendente dai bonifici), riserve pendenti, commissione corrente, storici paginati di vendite/movimenti/bonifici. Solo il proprietario approved accede; IBAN mascherato. Richiesta server-side dell’intero credito EUR, IBAN valido, una richiesta pending per rivenditore/valuta, riserva immediata sotto lock. Rifiuto rilascia la riserva; pagamento registra rilascio e uscita, senza doppio addebito.
+
+Assunzioni attuali: credito disponibile immediatamente, configurabile con CREDIT_MATURATION_DAYS (default 0); vendita normalizzata significa pagamento confermato. Un rimborso dopo il pagamento del bonifico può produrre debito: resta registrato e impedisce ulteriori prelievi. Un rimborso su credito riservato può rendere insufficiente il saldo per segnare paid; l’amministratore deve rifiutare e rilasciare la riserva prima di una nuova richiesta. L’esecuzione bancaria resta esterna. “Tienili per acquistare prodotti” è solo informativo; nessun credito al checkout. Stock, imposte, costo trasporto, resi logistici e provider reale richiedono il successivo contratto ecommerce.

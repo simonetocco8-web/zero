@@ -15,6 +15,22 @@ class WalletBalance
         return ExactInteger::parse($this->maturedEntries($retailer, $currency)->sum('amount_cents'));
     }
 
+    /** Current locking read, never a repeatable-read snapshot aggregate. Caller locks retailer first. */
+    public function availableCentsLocked(Retailer $retailer, string $currency = 'EUR'): int
+    {
+        $sum = BigInteger::zero();
+        foreach ($this->maturedEntries($retailer, $currency)->lockForUpdate()->get() as $entry) {
+            $sum = $sum->plus($entry->amount_cents);
+        }
+
+        return $sum->toInt();
+    }
+
+    public function netEarnedCents(Retailer $retailer, string $currency = 'EUR'): int
+    {
+        return ExactInteger::parse($this->maturedEntries($retailer, $currency)->whereNotNull('sale_item_id')->sum('amount_cents'));
+    }
+
     public function totalCents(Retailer $retailer, string $currency = 'EUR'): int
     {
         // Reservations change availability, not the actual credit owed to the retailer.
