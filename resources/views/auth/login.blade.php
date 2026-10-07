@@ -2,7 +2,7 @@
     <h1>Bentornato</h1><p class="mt-2 mb-6 text-sm text-slate-500">Accedi al tuo spazio ZeroMagazzino.</p>
     @if(session('status'))<x-alert variant="success" class="mb-4">{{ session('status') }}</x-alert>@endif
     <form method="POST" action="{{ route('login') }}" class="space-y-5">@csrf
-        <x-field name="email" label="Email" type="email" required autofocus autocomplete="username" />
+        <x-field name="email" label="Email" type="email" required autocomplete="username" />
         <x-field name="password" label="Password" type="password" required autocomplete="current-password" />
         <x-checkbox name="remember" label="Ricordami" />
         <x-button type="submit" class="w-full">Accedi</x-button>

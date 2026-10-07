@@ -26,7 +26,7 @@ if ($area === 'retailer' && (!auth()->user()->retailer || !auth()->user()->can('
     <div class="min-w-0 flex-1">
         <header class="border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-10">
             <div class="flex min-h-20 flex-wrap items-center justify-between gap-3 py-3">
-                <a href="{{ route($area.'.dashboard') }}" class="lg:hidden"><x-brand class="text-sm" /></a>
+                <a href="{{ route($area.'.dashboard') }}" class="inline-flex min-h-11 items-center lg:hidden"><x-brand class="text-sm" /></a>
                 <span class="hidden text-sm text-slate-500 lg:block">{{ $area === 'admin' ? 'Area amministratore' : 'Area rivenditore' }}</span>
                 <form method="POST" action="{{ route('logout') }}">@csrf<x-button variant="secondary" type="submit"><x-icon name="logout" /><span>Esci</span></x-button></form>
             </div>

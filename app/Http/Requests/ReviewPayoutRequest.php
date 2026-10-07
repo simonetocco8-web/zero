@@ -13,6 +13,6 @@ class ReviewPayoutRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['decision' => ['required', 'in:paid,rejected'], 'reason' => ['required_if:decision,rejected', 'nullable', 'string', 'max:1000'], 'payment_reference' => ['required_if:decision,paid', 'nullable', 'string', 'max:255']];
+        return ['decision' => ['required', 'in:paid,rejected'], 'reason' => ['required_if:decision,rejected', 'nullable', 'string', 'max:1000'], 'payment_reference' => ['required_if:decision,paid', 'nullable', 'string', 'max:191']];
     }
 }

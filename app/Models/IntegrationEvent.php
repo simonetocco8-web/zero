@@ -16,7 +16,7 @@ class IntegrationEvent extends Model
 
     protected $attributes = ['status' => 'pending', 'attempts' => 0];
 
-    protected $fillable = ['provider', 'external_event_id', 'event_type', 'payload_hash', 'payload', 'status', 'attempts', 'received_at', 'processed_at', 'next_attempt_at', 'error_code'];
+    protected $fillable = ['provider', 'external_event_id', 'event_type', 'payload_hash', 'payload', 'status', 'attempts', 'received_at', 'processed_at', 'next_attempt_at', 'error_code', 'processing_at'];
 
     protected $hidden = ['payload'];
 
@@ -28,6 +28,7 @@ class IntegrationEvent extends Model
             'attempts' => ExactIntegerCast::class,
             'received_at' => 'immutable_datetime',
             'processed_at' => 'immutable_datetime',
+            'processing_at' => 'immutable_datetime',
             'next_attempt_at' => 'immutable_datetime',
         ];
     }

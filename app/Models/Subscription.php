@@ -18,7 +18,7 @@ class Subscription extends Model
 
     protected $attributes = ['status' => 'pending', 'billing_interval' => 'monthly', 'currency' => 'EUR'];
 
-    protected $fillable = ['retailer_id', 'plan_id', 'status', 'billing_interval', 'currency', 'price_cents', 'starts_at', 'ends_at', 'cancelled_at'];
+    protected $fillable = ['retailer_id', 'plan_id', 'status', 'billing_interval', 'currency', 'price_cents', 'starts_at', 'ends_at', 'cancelled_at', 'billing_subscription_id'];
 
     protected function casts(): array
     {
@@ -36,6 +36,11 @@ class Subscription extends Model
     public function retailer(): BelongsTo
     {
         return $this->belongsTo(Retailer::class);
+    }
+
+    public function billingSubscription(): BelongsTo
+    {
+        return $this->belongsTo(BillingSubscription::class);
     }
 
     public function plan(): BelongsTo

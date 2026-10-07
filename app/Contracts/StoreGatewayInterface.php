@@ -9,4 +9,6 @@ interface StoreGatewayInterface
     public function updateProduct(string $externalId, array $data, int $revision): array;
 
     public function publishProduct(string $externalId, int $revision): array;
+
+    public function archiveProduct(string $externalId, int $revision): array;
 }

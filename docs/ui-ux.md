@@ -46,3 +46,11 @@ Layout `components/layouts/retailer.blade.php` e `admin.blade.php` condividono `
 ## Credito (Prompt 7)
 
 Metriche e storici in card responsive, nessuna tabella larga; layout rivenditore e navigazione mobile esistenti. Storici vendite, movimenti e bonifici con paginatori indipendenti server-side. Lordo/sconto/commissione snapshot/netto distinti, stato vendita e stato bonifico con testo, indicazione movimenti non ancora disponibili. IBAN mostra solo ultime quattro posizioni. Azione “RICEVI IL BONIFICO” disabilitata se credito non positivo, IBAN mancante o richiesta pendente; controlli equivalenti server-side. Feedback visibile dopo POST, errori di validazione, link al profilo per completare IBAN. Opzione acquisti futuri solo informativa.
+
+## Piano e pagamenti (Prompt 8)
+
+Dashboard collega la pagina billing, accessibile anche con profilo pending. Card mobile: piano attivo, stato aziendale, stato Stripe, fine periodo e rinnovo annullato; scelta mensile/annuale e Checkout ospitato. Prezzi mostrati dalle righe plans, pulsante disabilitato senza configurazione, errori generici e feedback sul ritorno. Nessun secret o parametro tecnico nell’interfaccia. Il messaggio di successo richiede attesa della conferma webhook, senza fingere attivazione. Anche il pannello admin distingue stato pagamento e stato approvazione.
+
+## Revisione UX (Prompt 9)
+
+Paginazione condivisa accessibile con target 44×44 px, wrapping dei testi lunghi e margini di scorrimento per non coprire i campi focalizzati con la navigazione mobile. Modal limitati alla viewport, conferma dell’archiviazione e ripristino del modal con errori vicino al campo. Checkbox con valore esplicito anche quando deselezionate. Form prodotto a pagina unica con sezioni e riepilogo aggiornato senza calcoli monetari JavaScript; errori di foto, condizione e descrizione associati ai campi. Layout pubblico con titoli specifici, skip link e nessun autofocus automatico. Evidenze e limiti in [audit.md](audit.md).

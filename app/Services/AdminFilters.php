@@ -3,13 +3,12 @@
 namespace App\Services;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 
 class AdminFilters
 {
     public function apply(Builder $query, array $filters, bool $retailers = false, bool $inventory = false): Builder
     {
-        $date = $inventory ? DB::raw('COALESCE(submitted_at, created_at)') : 'created_at';
         if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
@@ -21,11 +20,20 @@ class AdminFilters
                 $query->whereHas('retailer', fn ($q) => $q->where('company_name', 'like', '%'.$company.'%'));
             }
         }
-        if (! empty($filters['from'])) {
-            $query->whereDate($date, '>=', $filters['from']);
-        }
-        if (! empty($filters['to'])) {
-            $query->whereDate($date, '<=', $filters['to']);
+        foreach (['from' => '>=', 'to' => '<'] as $key => $operator) {
+            if (empty($filters[$key])) {
+                continue;
+            }
+            $boundary = Carbon::createFromFormat('!Y-m-d', $filters[$key]);
+            if ($key === 'to') {
+                $boundary->addDay();
+            }
+            if ($inventory) {
+                $query->where(fn ($q) => $q->where('submitted_at', $operator, $boundary)
+                    ->orWhere(fn ($fallback) => $fallback->whereNull('submitted_at')->where('created_at', $operator, $boundary)));
+            } else {
+                $query->where('created_at', $operator, $boundary);
+            }
         }
 
         return $query;

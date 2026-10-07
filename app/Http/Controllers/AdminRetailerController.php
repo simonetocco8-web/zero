@@ -12,7 +12,7 @@ class AdminRetailerController extends Controller
 {
     public function index(AdminFilterRequest $request, AdminFilters $filters)
     {
-        return view('admin.retailers', ['retailers' => $filters->apply(Retailer::query(), $request->validated(), true)->with('user', 'subscriptions.plan')->latest()->paginate(15)->withQueryString()]);
+        return view('admin.retailers', ['retailers' => $filters->apply(Retailer::query(), $request->validated(), true)->with('user', 'latestSubscription.plan', 'latestBillingSubscription')->latest()->paginate(15)->withQueryString()]);
     }
 
     public function review(ReviewRetailerRequest $request, Retailer $retailer, ReviewRetailer $action)

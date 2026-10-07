@@ -113,3 +113,92 @@ app(\App\Services\SaleAccounting::class)->refund([
 Ordini multi-rivenditore sono supportati con credito distinto per riga/proprietario. Il caller è un servizio interno fidato; proprietà prodotto/rivenditore verificata e vincolata dal DB. Gli identificativi ordine/riga/rimborso devono essere stabili e i replay conservare timestamp/dati originali; il riuso con contenuti diversi è errore. È accettato un alias external_event_id per lo stesso ordine/rimborso senza ripetere gli effetti. Rimborsi prima della vendita vengono rifiutati e devono essere ritentati dopo l’acquisizione della vendita dall’adapter futuro. Eventi/hash/payload conservati localmente, nessuna notifica esterna automatica.
 
 Il rimborso riguarda importi lordi della riga e restituisce la commissione pro quota; trasporto/tasse/commissioni non rimborsabili non sono modellati. CREDIT_MATURATION_DAYS regola la disponibilità dalla data della vendita; il rimborso diventa effettivo non prima del credito originale. Decidere questi aspetti prima dell’uso con denaro reale.
+
+
+## Infrastruttura implementata (Prompt 8)
+
+### Stripe Checkout e configurazione
+
+SDK ufficiale `stripe/stripe-php` 22, fissato nel lockfile (API richiesta dall’SDK: `2026-09-30.endive`). Nessun secret reale nel repository. Configurare nell’ambiente STRIPE_KEY, STRIPE_SECRET, STRIPE_WEBHOOK_SECRET, STRIPE_PRO_MONTHLY_PRICE_ID e STRIPE_PRO_YEARLY_PRICE_ID. STRIPE_KEY è predisposta per eventuali componenti client; l’attuale Checkout ospitato viene creato dal server e non richiede Stripe.js. Creare su Stripe due Price ricorrenti EUR: 6900 centesimi/mese e 49900 centesimi/anno, intervallo_count 1, quantità 1; usare inizialmente la modalità test e controllare corrispondenza con le righe `plans` locali.
+
+Dashboard → “Piano e pagamenti” (`/retailer/billing`), POST autenticato/CSRF `/retailer/billing/checkout`. Policy: solo proprietario rivenditore pending/approved, mai amministratore o profilo rejected/suspended. Il client sceglie soltanto monthly/yearly. Prezzo, proprietario, metadata e URL di ritorno sono derivati dal server. L’SDK verifica importo/valuta/intervallo del Price prima di creare Checkout `mode=subscription`; nessuna free trial o promozione configurata. URL di ritorno derivano da APP_URL (HTTPS in produzione).
+
+`billing_checkouts` conserva un intento server UUID, Price/importo/periodo, sessione e URL cifrata, scadenza dopo un’ora. Unicità dell’intento aperto per rivenditore + lock + idempotency key `zero-checkout:{uuid}` impediscono doppi Checkout anche dopo timeout o invii simultanei. Un intento aperto si riutilizza; cambio periodo richiede completamento o scadenza. Un abbonamento Stripe non terminato impedisce un nuovo acquisto. Un errore ambiguo mantiene l’intento per retry con la stessa chiave; non creare un nuovo intento per aggirare errori o doppie disposizioni. Il ritorno browser, anche con `result=success`, non prova il pagamento e non attiva PRO.
+
+Configurare webhook Stripe POST `/webhooks/stripe` per:
+- checkout.session.completed;
+- customer.subscription.created/updated/deleted;
+- invoice.payment_failed e invoice.paid.
+
+Firma verificata dall’SDK sul corpo raw, tolleranza 300 secondi; firma/payload non validi restituiscono 400, schema non valido 422, corpo oltre 1 MiB 413. Limitare il corpo anche nel reverse proxy. Endpoint stateless nel gruppo api, senza middleware sessione/CSRF: questa scelta riguarda esclusivamente webhook autenticati dalla firma. CSRF browser resta attiva. Rate limit 120/minuto/IP. Clock del server sincronizzato. Schema evento minimizzato e payload cifrato nella receipt, hash raw per conflitti di replay, mai log del corpo/firma/secrets.
+
+Il worker recupera **lo stato corrente** dell’abbonamento Stripe con latest_invoice espansa; cache lock distribuito serializza recupero e applicazione per subscription, senza chiamate remote nelle transazioni SQL. Timeout SDK connessione 5s/richiesta 15s, un retry di rete; job timeout 45s. Le subscription esterne senza metadata zero_checkout_id associata a un intento locale vengono ignorate: l’account Stripe può ospitare altri prodotti.
+
+PRO richiede status Stripe active e ultima fattura paid. Trialing/incomplete/past_due/unpaid non concedono PRO; invoice.payment_failed registra lo stato remoto e, se non pagato, ripristina FREE. invoice.paid può riattivare PRO. cancel_at_period_end mantiene PRO fino al termine pagato; cancellazione effettiva ripristina FREE. `billing_subscriptions` descrive il provider; `subscriptions` conserva intervalli locali di entitlement e prezzi snapshot. Cambio periodo/piano chiude l’intervallo precedente e ne apre uno nuovo; commissioni delle vendite acquisite non vengono riscritte. La cronologia resta disponibile per vendite ritardate. Eventi più vecchi della versione locale e cancellazioni di un vecchio abbonamento non disattivano quello successivo.
+
+**Pagamento e verifica aziendale sono indipendenti:** il worker non modifica retailers.status/approved_at/reviewed_by. PRO pagato ma pending rimane “Profilo in verifica” e non pubblica giacenze. Downgrade non elimina prodotti o foto: le nuove operazioni rispettano i limiti FREE e l’eventuale magazzino già oltre quota richiede gestione amministrativa.
+
+Decisioni da definire prima di addebiti reali: IVA/fatturazione, grace period dopo insoluti (attualmente perdita immediata dei benefit PRO), proration/cambio prezzo, cancellazione richiesta dal cliente e Customer Portal. Gli aggiornamenti/cancellazioni provenienti da Stripe sono gestiti, ma nessun portale o pulsante di cancellazione remoto è implementato in questa fase. Non dichiarare collaudata una sandbox Stripe reale senza credenziali di test e prova degli eventi.
+
+### Inbox, queue e recupero
+
+Gli endpoint rispondono 202 dopo receipt durevole `(provider, external_event_id)`; stesso ID/contenuto non produce altri effetti, contenuto differente restituisce 409. Jobs duplicati sono consentiti: claim transazionale, stato processing e lease 120s impediscono esecuzioni sovrapposte. Gli effetti economici restano protetti dalle ricevute canoniche e dalle chiavi univoche del ledger; un crash tra effetto e completamento inbox viene ritentato senza duplicazione.
+
+INTEGRATIONS_QUEUE_CONNECTION=database (default), coda `integrations`; usare una connessione durevole database/redis/sqs/beanstalkd, mai sync/deferred/null per webhook. QUEUE_CONNECTION del resto dell’app non forza il webhook ad essere sincrono. Se dispatch fallisce, receipt pending conserva integration_dispatch_failed e lo scheduler recupera. Worker e scheduler sono obbligatori:
+
+```sh
+php artisan queue:work database --queue=integrations --timeout=45 --tries=5
+php artisan schedule:work
+# In produzione: process supervisor e cron schedule:run ogni minuto.
+```
+
+Cinque tentativi applicativi, backoff 10/60/300/900s, codice errore redatto in integration_events, nessuna eccezione SDK sensibile in failed_jobs. Claim interrotti vengono recuperati dopo lease scaduta. `integrations:retry` ogni minuto recupera pending/failed dovuti e processing scaduti, fino a 1000 per ciclo; ignora eventi del ledger già processed e non riguarda le receipt canoniche `accounting.*`. Dopo cinque errori serve controllo operativo e retry esplicito:
+
+```sh
+php artisan integrations:retry --event=ID_LOCALE --force
+php artisan billing:sync
+```
+
+billing:sync orario accoda una riconciliazione per abbonamento non terminato; nessuna chiamata Stripe nel comando. Cache database/Redis condivisa tra worker è necessaria per i lock distribuiti; cache array è solo per test. Monitorare backlog, receipt failed, failed_jobs e anzianità delle operazioni. Non cancellare receipt o ledger per consentire retry.
+
+### Gateway negozio e protocollo fake
+
+STORE_DRIVER=fake. Il binding risolve `config/store.php`, drivers.{driver}.gateway; un driver sconosciuto fallisce e **non** ripiega sul fake. StoreGatewayInterface comprende createProduct, updateProduct, publishProduct e archiveProduct. Il fake conserva ID/revisioni e flag archived: archive idempotente, pubblicazioni vecchie non riattivano il prodotto, nuova revisione approvata può pubblicarlo. Il metodo archive è pronto nel contratto; le regole locali che limitano l’archiviazione delle giacenze rimangono quelle esistenti.
+
+Il fake esegue pubblicazioni dopo commit in modo sincrono. Un driver esplicitamente configurato diverso da fake accoda ProcessStorePublication sulla queue integrations; store:sync recupera e accoda operazioni durevoli. Un provider reale deve supportare chiavi stabili per revisione, mapping remoto, timeout e riconciliazione prima dell’uso.
+
+Endpoint POST `/webhooks/store/{driver}`: solo driver esplicitamente registrati con StoreWebhookAdapter. Nessun ecommerce reale assunto. Adapter fake disabilitato finché STORE_WEBHOOK_SECRET è vuoto; il protocollo seguente è esclusivamente un contratto di test, non una firma universale di ecommerce:
+- X-Zero-Timestamp: Unix timestamp in secondi, finestra ±300s;
+- X-Zero-Signature: `v1=` + HMAC-SHA256(secret, timestamp + '.' + corpo raw);
+- JSON: `event_id`, `type` order.paid/refund, `data` nel formato economico del Prompt 7.
+
+```json
+{
+  "event_id": "shop-event-123",
+  "type": "order.paid",
+  "data": {
+    "external_order_id": "ordine-123",
+    "timestamp": "2026-10-07T10:00:00Z",
+    "items": [{
+      "external_line_id": "riga-1",
+      "inventory_item_id": 123,
+      "retailer_id": 45,
+      "quantity": "2.000",
+      "unit_price_cents": 10000,
+      "discount_cents": 1000
+    }]
+  }
+}
+```
+
+Per refund: data.external_refund_id stabile, external_order_id/timestamp e items con external_line_id/amount_cents. Importi interi, quantità stringa esatta; float rifiutati. Provider e identificativo evento sono derivati dall’adapter/envelope, mai sovrascrivibili dentro data. StoreEventData e FinancialEventData sono DTO readonly validati; il dominio SaleAccounting continua ad accettare i vecchi array interni ma usa la medesima normalizzazione. L’intake valida il formato; associazione prodotto/rivenditore e limiti del rimborso sono verificati dal worker in transazione. Refund prima della vendita fallisce in modo durevole e viene ritentato dopo l’acquisizione dell’ordine.
+
+### Aggiungere un nuovo provider
+
+1. Implementare App\Contracts\StoreGatewayInterface con SDK/HTTP del provider, senza chiamate da Models/controller e senza credenziali nei payload. Mantenerne stabile il contratto per dati/revisioni/ID e non restituire tokens o risposte personali complete.
+2. Implementare App\Contracts\StoreWebhookAdapter::verifyAndNormalize: firma ufficiale sul corpo raw, controllo timestamp/destinazione secondo documentazione del provider, validazione schema, mapping degli ID remoti ai prodotti/retailer locali e traduzione in StoreEventData. Non fidarsi di un retailer_id arbitrario del negozio; derivarlo dal mapping remoto verificato. Vietato usare il namespace stripe.
+3. Registrare un nome esplicito in config/store.php con gateway, webhook e riferimenti env per le proprie credenziali/secret. Impostare STORE_DRIVER soltanto quando l’uscita verso quel provider è pronta. Non cambiare le regole economiche per adattare nomi di campo del provider.
+4. Registrare nel provider l’URL HTTPS /webhooks/store/{nome}; fare arrivare al dominio solo order.paid confermato e refund con ID stabili, stessa valuta e timestamp originali ai replay. Esporre API separate soltanto se richieste e autenticate.
+5. Testare gateway con fake HTTP, signature valida/errata/scaduta, payload modificato, duplicati/concorrenza, evento fuori ordine, timeout e risposta persa; quindi fare contract test nella sandbox reale. Concordare stock, tasse, spedizione e rimborsi con il provider prima della produzione.
+
+I test attuali simulano trasporto HTTP dell’SDK Stripe, webhook firmati, queue e provider; non effettuano pagamenti reali o chiamate a negozi esterni.

@@ -109,7 +109,7 @@ Regole permanenti: [AGENTS.md](AGENTS.md). Specifiche: [requirements](docs/requi
 
 Dettagli in [docs/database.md](docs/database.md). Importi `_cents` interi, percentuali in basis point e quantità `quantity_milliunits` intere con accessor `quantity` a tre decimali. Le factory coprono tutte le entità; `DatabaseSeeder` esegue esclusivamente `PlanSeeder`, senza account demo. Il seed è ripetibile e preserva piani già personalizzati.
 
-FREE: 5 articoli, 10.000 € di magazzino, niente scambio, commissione 2%. PRO: 69 €/mese o 499 €/anno, limiti NULL (illimitati), scambio e commissione 0,5%. I default sono in `config/plans.php`; il runtime legge le righe `plans`. Le quote non sono ancora applicate nei placeholder.
+FREE: 5 articoli, 10.000 € di magazzino, niente scambio, commissione 2%. PRO: 69 €/mese o 499 €/anno, limiti NULL (illimitati), scambio e commissione 0,5%. I default sono in `config/plans.php`; il runtime legge le righe `plans`. Quote e scambio sono verificati sul server nelle operazioni di inventario.
 
 Il ledger e gli audit sono append-only anche a livello DB. Il deploy delle nuove migration richiede CHECK supportati (MySQL 8.0.16+) e privilegi per i trigger; non omettere la migration dei vincoli. I test su MySQL devono continuare a usare il database dedicato, mai quello applicativo.
 
@@ -121,8 +121,24 @@ Dopo aggiornamenti eseguire `php artisan migrate`; la migration del Prompt 4 agg
 
 ### Pannello amministratore e negozio simulato
 
-Solo utenti autenticati con ruolo admin possono vedere/gestire rivenditori, giacenze e bonifici. Non esistono password amministrative predefinite. Liste filtrabili e paginate, conferme prima delle azioni, audit consultabile nella dashboard. PRO mostra pagamento non verificato fino a un’integrazione reale.
+Solo utenti autenticati con ruolo admin possono vedere/gestire rivenditori, giacenze e bonifici. Non esistono password amministrative predefinite. Liste filtrabili e paginate, conferme prima delle azioni, audit consultabile nella dashboard. Il pagamento PRO viene verificato dai webhook Stripe e resta separato dall’approvazione aziendale.
 
-La pubblicazione usa esclusivamente `FakeStoreGateway`; `store_publications` registra snapshot, stato e risultato e `fake_store_products` il catalogo simulato. Per recuperare simulazioni interrotte/fallite: `php artisan store:sync`. Il gateway non effettua richieste di rete. Eseguire le nuove migration prima di avviare l’app.
+La pubblicazione usa `FakeStoreGateway` con STORE_DRIVER=fake (default); provider futuri devono essere registrati esplicitamente in config/store.php. `store_publications` registra snapshot, stato e risultato e `fake_store_products` il catalogo simulato. Per recuperare simulazioni interrotte/fallite: `php artisan store:sync`. Il gateway non effettua richieste di rete. Eseguire le nuove migration prima di avviare l’app.
 
-Segnare un bonifico come pagato richiede la riserva coerente nel ledger e il riferimento di una disposizione bancaria già eseguita esternamente. La creazione delle richieste dal rivenditore resta una fase successiva.
+Segnare un bonifico come pagato richiede la riserva coerente nel ledger e il riferimento di una disposizione bancaria già eseguita esternamente. Le richieste del rivenditore riservano tutto il credito disponibile, con IBAN validato e vincolo di una sola richiesta pendente.
+
+### Stripe, webhook e worker
+
+Configurazione completa e tutorial per nuovi provider in [docs/integrations.md](docs/integrations.md). STRIPE_KEY/STRIPE_SECRET/STRIPE_WEBHOOK_SECRET e Price ID mensile/annuale vanno configurati nell’ambiente; senza valori non vengono creati Checkout. STRIPE_SECRET e secret webhook non devono comparire nei log. Nessuna sandbox esterna è richiesta per i test fake.
+
+```sh
+php artisan migrate
+php artisan queue:work database --queue=integrations --timeout=45 --tries=5
+# In un altro processo per sviluppo:
+php artisan schedule:work
+# Recupero operativo, senza eliminare receipt:
+php artisan integrations:retry
+php artisan billing:sync
+```
+
+INTEGRATIONS_QUEUE_CONNECTION sceglie la connessione durevole (default database); se diversa, usare la stessa nel comando worker. Cache database/Redis condivisa per i lock Stripe. I webhook /webhooks/stripe e /webhooks/store/{driver} sono stateless e firmati; l’adapter fake richiede STORE_WEBHOOK_SECRET. Ritorno da Checkout non equivale a pagamento. Non usare sync per la queue delle integrazioni.

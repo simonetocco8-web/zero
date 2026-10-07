@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Data\FinancialEventData;
 use App\Models\IntegrationEvent;
 use App\Models\InventoryItem;
 use App\Models\Plan;
@@ -9,22 +10,24 @@ use App\Models\Retailer;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\WalletTransaction;
-use App\Support\ExactInteger;
 use App\Support\MoneyMath;
 use Brick\Math\BigDecimal;
 use Brick\Math\BigInteger;
 use Brick\Math\RoundingMode;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 /** Trusted adapter entry point for confirmed paid sales; no public unsigned webhook endpoint. */
 class SaleAccounting
 {
-    public function recordSale(array $input): Sale
+    public function recordSale(array|FinancialEventData $input): Sale
     {
-        $data = $this->normalize($input, false);
+        $dto = $input instanceof FinancialEventData ? $input : FinancialEventData::fromArray('order.paid', $input);
+        if ($dto->type !== 'order.paid') {
+            $this->invalid('type', 'Atteso evento vendita.');
+        }
+        $data = $dto->toArray();
 
         return DB::transaction(function () use ($data) {
             $event = $this->receipt($data, 'sale', $data['external_order_id']);
@@ -45,7 +48,7 @@ class SaleAccounting
                     $this->invalid('items', 'Prodotto e rivenditore non corrispondono, oppure valuta non supportata.');
                 }
                 $retailer = Retailer::findOrFail($line['retailer_id']);
-                $subscription = $retailer->subscriptions()->whereIn('status', ['active', 'cancelled', 'expired'])->where('starts_at', '<=', $data['timestamp'])->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>', $data['timestamp']))->where(fn ($q) => $q->whereNull('cancelled_at')->orWhere('cancelled_at', '>', $data['timestamp']))->orderByDesc('starts_at')->lockForUpdate()->first();
+                $subscription = $retailer->subscriptions()->whereIn('status', ['active', 'cancelled', 'expired'])->where('starts_at', '<=', $data['timestamp'])->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>', $data['timestamp']))->where(fn ($q) => $q->whereNull('cancelled_at')->orWhere('cancelled_at', '>', $data['timestamp']))->orderByDesc('starts_at')->orderByDesc('id')->lockForUpdate()->first();
                 if (! $subscription) {
                     $this->invalid('plan', 'Nessun piano valido alla data della vendita.');
                 }
@@ -68,9 +71,13 @@ class SaleAccounting
         }, 5);
     }
 
-    public function refund(array $input): Sale
+    public function refund(array|FinancialEventData $input): Sale
     {
-        $data = $this->normalize($input, true);
+        $dto = $input instanceof FinancialEventData ? $input : FinancialEventData::fromArray('refund', $input);
+        if ($dto->type !== 'refund') {
+            $this->invalid('type', 'Atteso evento rimborso.');
+        }
+        $data = $dto->toArray();
 
         return DB::transaction(function () use ($data) {
             $event = $this->receipt($data, 'refund', $data['external_refund_id']);
@@ -127,60 +134,6 @@ class SaleAccounting
 
             return $sale;
         }, 5);
-    }
-
-    private function normalize(array $input, bool $refund): array
-    {
-        $integer = function ($attribute, $value, $fail) {
-            try {
-                if (ExactInteger::parse($value) < 0) {
-                    $fail('Importo non valido.');
-                }
-            } catch (\Throwable) {
-                $fail('Usare centesimi interi, mai float.');
-            }
-        };
-        $rules = ['currency' => ['sometimes', 'in:EUR'], 'provider' => ['required', 'string', 'max:100', 'regex:/^[a-zA-Z0-9_-]+$/'], 'external_order_id' => ['required', 'string', 'max:191'], 'external_event_id' => ['sometimes', 'string', 'max:191'], 'timestamp' => ['required', 'date'], 'items' => ['required', 'array', 'min:1', 'max:100'], 'items.*.external_line_id' => ['required', 'string', 'max:191', 'distinct:strict']];
-        if ($refund) {
-            $rules += ['external_refund_id' => ['required', 'string', 'max:191'], 'items.*.amount_cents' => ['required', $integer]];
-        } else {
-            $rules += ['items.*.inventory_item_id' => ['required', 'integer', 'min:1'], 'items.*.retailer_id' => ['required', 'integer', 'min:1'], 'items.*.quantity' => ['required', 'regex:/^[0-9]+(?:\.[0-9]{1,3})?$/'], 'items.*.unit_price_cents' => ['required', $integer], 'items.*.discount_cents' => ['sometimes', $integer]];
-        }
-        $valid = Validator::make($input, $rules)->validate();
-        $data = ['provider' => $valid['provider'], 'external_order_id' => $valid['external_order_id'], 'timestamp' => CarbonImmutable::parse($valid['timestamp'])->utc()->format('Y-m-d H:i:s'), 'items' => []];
-        if ($refund) {
-            $data['external_refund_id'] = $valid['external_refund_id'];
-        }
-        foreach ($valid['items'] as $line) {
-            if ($refund) {
-                $amount = ExactInteger::parse($line['amount_cents']);
-                if ($amount === 0) {
-                    $this->invalid('amount_cents', 'Il rimborso deve essere positivo.');
-                }
-                $data['items'][] = ['external_line_id' => $line['external_line_id'], 'amount_cents' => $amount];
-            } else {
-                if (is_float($line['quantity'])) {
-                    $this->invalid('quantity', 'Usare una quantità decimale esatta.');
-                }
-                try {
-                    $quantity = BigDecimal::of($line['quantity'])->multipliedBy(1000)->toBigInteger()->toInt();
-                    $price = ExactInteger::parse($line['unit_price_cents']);
-                    MoneyMath::lineTotalCents($price, $quantity);
-                } catch (\Throwable) {
-                    $this->invalid('items', 'Quantità o importo fuori intervallo.');
-                }
-                if ($quantity <= 0) {
-                    $this->invalid('quantity', 'La quantità deve essere positiva.');
-                }
-                $data['items'][] = ['external_line_id' => $line['external_line_id'], 'inventory_item_id' => (int) $line['inventory_item_id'], 'retailer_id' => (int) $line['retailer_id'], 'quantity_milliunits' => $quantity, 'unit_price_cents' => $price, 'discount_cents' => ExactInteger::parse($line['discount_cents'] ?? 0)];
-            }
-        }
-        usort($data['items'], fn ($a, $b) => strcmp($a['external_line_id'], $b['external_line_id']));
-        if (isset($valid['external_event_id'])) {
-            $data['external_event_id'] = $valid['external_event_id'];
-        }
-
-        return $data;
     }
 
     private function receipt(array $data, string $type, string $businessId): IntegrationEvent

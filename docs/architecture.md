@@ -93,3 +93,13 @@ SaleAccounting::recordSale e ::refund sono ingressi interni per adapter fidati. 
 RequestPayout applica Policy, controllo stato sotto lock, validazione IBAN, unicità pending e saldo corrente; crea richiesta e riserva nello stesso commit. ReviewPayout conserva audit amministrativo, rilascia riserve e registra il pagamento esterno solo con copertura sufficiente. WalletBalance separa disponibile, netto maturato e riservato. CreditController espone esclusivamente dati derivati dal rivenditore autenticato; Form Request rifiuta selezione client di proprietario, importo, valuta o IBAN.
 
 Le operazioni economiche non modificano le giacenze: la fonte autorevole dello stock e il comportamento dei resi devono essere concordati col negozio. Prima di integrare provider reali, definire maturazione, tasse/commissioni, dati fiscali, riconciliazione, eventi fuori ordine e gestione debiti.
+
+## Infrastruttura integrazioni (Prompt 8)
+
+StripeSdkGateway usa il solo SDK ufficiale tramite StripeBillingGateway, senza Cashier o nuovo framework. StartStripeCheckout prepara intento transazionale, invoca Stripe fuori dal lock e salva la sessione idempotente. SyncStripeSubscription recupera dati correnti sotto cache lock distribuito e applica entitlement locale in transazione, senza modificare l’approvazione aziendale. BillingSubscription è separata dagli intervalli storici Subscription.
+
+WebhookController verifica firma raw e delega WebhookInbox: receipt durevole, payload cifrato e queue integrations. ProcessIntegrationEvent acquisisce lease, applica Stripe oppure FinancialEventData al dominio economico e registra completamento/errori redatti. Scheduler recupera dispatch mancati e riconcilia Stripe. StoreGatewayInterface e StoreWebhookAdapter vengono registrati esplicitamente in config/store.php; driver sconosciuti falliscono senza simulazioni implicite. Routes webhook stateless separate in routes/integrations.php; routes browser con CSRF e Policy conservate.
+
+## Revisione sicurezza e performance (Prompt 9)
+
+PrivatePageHeaders centralizza no-store per pagine autenticate e form auth, nosniff e Referrer-Policy. Foto servite/cancellate solo da riferimenti local/inventory/UUID.jpg; InventoryPhotos ripete il limite sorgente di 15 MB anche fuori dai Form Requests. Conferma/cambio password limitati a 6 richieste al minuto; reset token escluso dai dati flash; errori SQL di produzione registrati con soli codici e nome connessione, senza messaggi o bindings. Elenchi amministrativi eager loaded con latestOfMany, dashboard con cursor di sole quantità/prezzi e conteggio nello stesso passaggio, filtri date con bound inclusivi senza funzioni sulle colonne. Report in [audit.md](audit.md).

@@ -12,7 +12,7 @@ class AdminInventoryController extends Controller
 {
     public function index(AdminFilterRequest $request, AdminFilters $filters)
     {
-        return view('inventory.admin', ['items' => $filters->apply(InventoryItem::query(), $request->validated(), false, true)->with('retailer', 'images', 'publications')->latest()->paginate(15)->withQueryString()]);
+        return view('inventory.admin', ['items' => $filters->apply(InventoryItem::query(), $request->validated(), false, true)->with('retailer', 'images', 'latestPublication')->latest()->paginate(15)->withQueryString()]);
     }
 
     public function review(ReviewInventoryRequest $request, InventoryItem $item, ReviewInventoryItem $action)

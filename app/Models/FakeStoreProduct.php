@@ -10,10 +10,10 @@ class FakeStoreProduct extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['id', 'revision', 'payload', 'published'];
+    protected $fillable = ['id', 'revision', 'payload', 'published', 'archived'];
 
     protected function casts(): array
     {
-        return ['payload' => 'array', 'published' => 'boolean', 'revision' => 'integer'];
+        return ['payload' => 'array', 'published' => 'boolean', 'archived' => 'boolean', 'revision' => 'integer'];
     }
 }
