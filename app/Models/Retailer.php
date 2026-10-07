@@ -72,6 +72,21 @@ class Retailer extends Model
         return $this->hasMany(PayoutRequest::class);
     }
 
+    public function latestSubscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class)->latestOfMany();
+    }
+
+    public function latestBillingSubscription(): HasOne
+    {
+        return $this->hasOne(BillingSubscription::class)->latestOfMany();
+    }
+
+    public function billingSubscriptions(): HasMany
+    {
+        return $this->hasMany(BillingSubscription::class);
+    }
+
     public function activeSubscription(): HasOne
     {
         return $this->hasOne(Subscription::class)->where('status', SubscriptionStatus::Active->value);

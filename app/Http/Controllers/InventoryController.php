@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\SaveInventoryItem;
 use App\Http\Requests\InventoryRequest;
 use App\Models\InventoryItem;
+use App\Services\InventoryPhotos;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -68,7 +69,7 @@ class InventoryController extends Controller
             $photo = $item->proposed_images[$position] ?? null;
         } else {
             $photo = $item->images()->where('position', $position)->first()?->only(['disk', 'path']);
-        } abort_unless($photo, 404);
+        } abort_unless($photo && app(InventoryPhotos::class)->isSafeReference($photo), 404);
 
         return Storage::disk($photo['disk'])->response($photo['path'], null, ['Content-Type' => 'image/jpeg', 'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store']);
     }

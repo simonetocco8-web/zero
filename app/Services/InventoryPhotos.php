@@ -12,6 +12,9 @@ class InventoryPhotos
 {
     public function store(UploadedFile $file): array
     {
+        if (! $file->isValid() || $file->getSize() > 15 * 1024 * 1024) {
+            throw ValidationException::withMessages(['photos' => 'Foto non valida o superiore a 15 MB.']);
+        }
         $mime = $file->getMimeType();
         $format = match ($mime) {
             'image/jpeg' => 'jpeg','image/png' => 'png','image/webp' => 'webp',default => null
@@ -39,10 +42,18 @@ class InventoryPhotos
         }
     }
 
+    public function isSafeReference(array $photo): bool
+    {
+        return ($photo['disk'] ?? null) === 'local' && is_string($photo['path'] ?? null)
+            && preg_match('/\Ainventory\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\.jpg\z/i', $photo['path']) === 1;
+    }
+
     public function delete(array $photos): void
     {
         foreach ($photos as $photo) {
-            Storage::disk($photo['disk'])->delete($photo['path']);
+            if ($this->isSafeReference($photo)) {
+                Storage::disk('local')->delete($photo['path']);
+            }
         }
     }
 }

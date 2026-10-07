@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminInventoryController;
 use App\Http\Controllers\AdminPayoutController;
 use App\Http\Controllers\AdminRetailerController;
 use App\Http\Controllers\AvailabilityController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CreditController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
@@ -34,6 +35,9 @@ Route::middleware(['auth', 'can:accessRetailerArea,'.User::class])->prefix('reta
     Route::patch('requests/{availabilityRequest}', [AvailabilityController::class, 'update'])->middleware([EnsureApprovedRetailer::class, 'throttle:30,1'])->name('requests.update');
     Route::get('credit', [CreditController::class, 'index'])->middleware(EnsureApprovedRetailer::class)->name('credit');
     Route::post('credit/payout', [CreditController::class, 'store'])->middleware([EnsureApprovedRetailer::class, 'throttle:5,1'])->name('credit.payout');
+    Route::get('billing', [BillingController::class, 'index'])->name('billing');
+    Route::post('billing/checkout', [BillingController::class, 'checkout'])->middleware('throttle:5,1')->name('billing.checkout');
+    Route::get('billing/return', [BillingController::class, 'returned'])->name('billing.return');
     Route::get('profile', [RetailerController::class, 'profile'])->name('profile');
     Route::put('profile', [RetailerController::class, 'update'])->middleware('throttle:20,1')->name('profile.update');
 });

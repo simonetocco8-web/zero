@@ -1,4 +1,4 @@
-<x-guest-layout>
+<x-guest-layout title="Registrazione">
 <nav class="mb-6 flex gap-5" aria-label="Accesso"><a class="inline-flex min-h-11 items-center underline" href="{{ route('login') }}">Accedi</a><span class="inline-flex min-h-11 items-center font-semibold" aria-current="page">Registrati</span></nav>
 <h1>Registra la tua azienda</h1><p class="my-4 text-sm text-slate-600">Dopo la registrazione verificheremo il profilo della tua azienda.</p>
 <form method="POST" action="{{ route('register') }}" class="space-y-5">@csrf

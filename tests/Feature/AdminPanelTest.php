@@ -163,6 +163,11 @@ class AdminPanelTest extends TestCase
     {
         $this->app->instance(StoreGatewayInterface::class, new class implements StoreGatewayInterface
         {
+            public function archiveProduct(string $externalId, int $revision): array
+            {
+                return (new FakeStoreGateway)->archiveProduct($externalId, $revision);
+            }
+
             public function createProduct(string $productKey, array $data, int $revision): array
             {
                 return (new FakeStoreGateway)->createProduct($productKey, $data, $revision);

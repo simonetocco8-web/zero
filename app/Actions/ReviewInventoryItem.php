@@ -55,9 +55,13 @@ class ReviewInventoryItem
             $item->save();
             app(RecordAdministrativeAction::class)->handle($actor, $decision === 'published' ? AdministrativeAction::InventoryApproved : AdministrativeAction::InventoryRejected, $item, $before, ['status' => $item->status->value]);
         });
-        // Fake gateway only: execute after commit. Durable pending records survive interruption.
+        // Fake remains synchronous; explicitly configured real drivers always use the durable queue after commit.
         if ($publicationId) {
-            ProcessStorePublication::dispatchSync($publicationId);
+            if (config('store.driver') === 'fake') {
+                ProcessStorePublication::dispatchSync($publicationId);
+            } else {
+                ProcessStorePublication::dispatch($publicationId)->onConnection(config('integrations.queue_connection'))->onQueue(config('integrations.queue'))->afterCommit();
+            }
         }
     }
 }

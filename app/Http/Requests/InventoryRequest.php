@@ -18,7 +18,7 @@ class InventoryRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'], 'brand' => ['nullable', 'string', 'max:255'], 'category' => ['required', 'string', 'max:120'],
-            'sku' => ['nullable', 'string', 'max:255', Rule::unique('inventory_items', 'sku')->where('retailer_id', $this->user()->retailer->id)->ignore($this->route('item')?->id)], 'ean' => ['nullable', 'string', 'max:255'],
+            'sku' => ['nullable', 'string', 'max:191', Rule::unique('inventory_items', 'sku')->where('retailer_id', $this->user()->retailer->id)->ignore($this->route('item')?->id)], 'ean' => ['nullable', 'string', 'max:191'],
             'quantity' => ['required', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,3})?$/'],
             'zero_price' => ['required', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,2})?$/'],
             'list_price' => ['nullable', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,2})?$/'],
