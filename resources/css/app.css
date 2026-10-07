@@ -1,0 +1,35 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../views/**/*.blade.php';
+@source '../js/**/*.js';
+
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --color-brand-50: #ecfdf5;
+    --color-brand-100: #d1fae5;
+    --color-brand-600: #047857;
+    --color-brand-700: #065f46;
+    --color-brand-950: #022c22;
+}
+@layer base {
+    body { @apply bg-slate-50 text-slate-900 font-sans antialiased; }
+    h1 { @apply text-2xl sm:text-3xl font-bold tracking-tight; }
+    h2 { @apply text-xl font-semibold tracking-tight; }
+    a, button, input, select, textarea { @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { @apply cursor-pointer; }
+    [x-cloak] { display: none !important; }
+    dialog::backdrop { background: rgb(15 23 42 / 0.65); }
+}
+@layer components {
+    .btn { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+    .btn-primary { @apply bg-brand-600 text-white hover:bg-brand-700; }
+    .btn-secondary { @apply border border-slate-300 bg-white text-slate-800 hover:bg-slate-100; }
+    .btn-danger { @apply bg-red-700 text-white hover:bg-red-800; }
+    .field { @apply block w-full min-h-11 rounded-xl border-slate-300 bg-white text-slate-900 shadow-sm focus:border-brand-600 focus:ring-brand-600; }
+    .field-label { @apply block mb-1.5 text-sm font-medium text-slate-700; }
+    .nav-item { @apply flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium; }
+    .nav-active { @apply bg-white/10 text-white; }
+    .nav-idle { @apply text-emerald-100 hover:bg-white/5 hover:text-white; }
+}
