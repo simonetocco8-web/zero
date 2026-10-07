@@ -149,3 +149,7 @@ php artisan integrations:retry --event=ID_LOCALE --force
 Non cancellare receipt, ledger o audit per ripetere operazioni. Monitorare errori, eventi esauriti, backlog e disponibilità di cron/worker/mail. `MAIL_MAILER=log` è solo per sviluppo: contiene link di reset e non va usato in produzione.
 
 Regole: [AGENTS.md](AGENTS.md). Specifiche: [requirements](docs/requirements.md), [architecture](docs/architecture.md), [database](docs/database.md), [UI/UX](docs/ui-ux.md), [audit](docs/audit.md).
+
+## cPanel senza SSH o Terminale
+
+Per la sola prima installazione tramite File Manager: [procedura cPanel senza CLI](docs/cpanel-no-ssh-deployment.md). Il workflow manuale **Build deploy package** genera `zeromagazzino-deploy.zip` con vendor e asset; un installer web temporaneo, disabilitato senza `ZERO_INSTALL_TOKEN`, esegue migration/PlanSeeder/cache e deve essere eliminato dopo l’uso. Queue e scheduler richiedono comunque un servizio del provider; il pacchetto non esegue deployment automatici.

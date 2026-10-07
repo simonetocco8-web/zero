@@ -1,0 +1,57 @@
+name: Build deploy package
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Pacchetto cPanel / PHP 8.4 / Node 24
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_ENV: production
+      APP_DEBUG: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: PHP e Composer
+        uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: "8.4"
+          extensions: bcmath, ctype, curl, dom, fileinfo, filter, intl, mbstring, openssl, pcntl, pdo_mysql, session, tokenizer, xml, xmlwriter, zip
+          tools: composer:2
+          coverage: none
+      - name: Dipendenze PHP di produzione
+        run: |
+          composer validate --strict
+          composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+          composer check-platform-reqs --no-dev
+      - name: Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Build frontend
+        run: |
+          npm ci
+          npm run build
+          test -f vendor/autoload.php
+          test -f public/build/manifest.json
+      - name: Crea ZIP senza segreti o cache del runner
+        run: bash scripts/build-deploy-package.sh "$RUNNER_TEMP/zero-package"
+      - name: Artifact scaricabile
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: zeromagazzino-deploy-${{ github.sha }}
+          path: ${{ runner.temp }}/zero-package/zeromagazzino-deploy.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
