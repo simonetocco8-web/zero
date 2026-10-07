@@ -4,7 +4,7 @@
 
 Monolite Laravel standard con rendering Blade. Due aree autenticate, rivenditore e amministratore, condividono dominio e database; il cliente usa il negozio esterno. Nessun microservizio o frontend SPA previsto.
 
-PHP >= 8.3 e MySQL >= 8.0 sono requisiti minimi. Prima dello scaffold scegliere una versione Laravel stabile supportata dal runtime effettivo, fissare dipendenze e lockfile, e verificare estensioni PHP e versione Node richiesta da Vite. Non è ancora dichiarata una versione Laravel verificata.
+Il requisito PHP effettivo del lockfile corrente è >= 8.4.1 (Symfony 8.1), dichiarato anche in composer.json; Laravel è fissato a 13.35.0. MySQL >= 8.0.16 per CHECK applicati, consigliato 8.4. Node 24 LTS per gli asset Vite 8. Versioni e requisiti di deployment in README.md e docs/deployment.md.
 
 ## Organizzazione prevista
 
@@ -103,3 +103,7 @@ WebhookController verifica firma raw e delega WebhookInbox: receipt durevole, pa
 ## Revisione sicurezza e performance (Prompt 9)
 
 PrivatePageHeaders centralizza no-store per pagine autenticate e form auth, nosniff e Referrer-Policy. Foto servite/cancellate solo da riferimenti local/inventory/UUID.jpg; InventoryPhotos ripete il limite sorgente di 15 MB anche fuori dai Form Requests. Conferma/cambio password limitati a 6 richieste al minuto; reset token escluso dai dati flash; errori SQL di produzione registrati con soli codici e nome connessione, senza messaggi o bindings. Elenchi amministrativi eager loaded con latestOfMany, dashboard con cursor di sole quantità/prezzi e conteggio nello stesso passaggio, filtri date con bound inclusivi senza funzioni sulle colonne. Report in [audit.md](audit.md).
+
+## Verifica e distribuzione (Prompt 10)
+
+GitHub Actions valida dipendenze/installazione congelata, piattaforma PHP 8.4, formatter completo, build Node 24, suite MySQL con concorrenza e SQLite, cache config/route/view e scheduler. Production document root sul solo public, storage privato persistente, queue durevole e cron ogni minuto. Nessun deployment automatico. Procedure, variabili, copertura e checklist in deployment.md, environment.md, testing.md e pre-production-checklist.md.
