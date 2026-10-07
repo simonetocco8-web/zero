@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,8 +19,9 @@ class RegistrationTest extends TestCase
 
     public function test_new_users_can_register(): void
     {
+        $this->seed(PlanSeeder::class);
         $response = $this->post('/register', [
-            'name' => 'Test User',
+            'company_name' => 'Test Company', 'vat_number' => '12345678901', 'city' => 'Roma', 'plan_code' => 'free',
             'email' => 'test@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',

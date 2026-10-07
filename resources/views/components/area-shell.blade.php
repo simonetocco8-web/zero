@@ -1,5 +1,10 @@
 @props(['area', 'title'])
-@php($links = config('navigation.'.$area))
+@php
+$links = config('navigation.'.$area);
+if ($area === 'retailer' && (!auth()->user()->retailer || !auth()->user()->can('operate', auth()->user()->retailer))) {
+    $links = array_filter($links, fn($link) => in_array($link['route'], ['retailer.dashboard', 'retailer.profile']));
+}
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head><x-head :title="$title" /></head>

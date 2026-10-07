@@ -28,6 +28,7 @@ class InventoryItem extends Model
     protected function casts(): array
     {
         return [
+            'proposed_data' => 'array', 'proposed_images' => 'array',
             'quantity_milliunits' => ExactIntegerCast::class,
             'currency' => CurrencyCode::class,
             'list_price_cents' => ExactIntegerCast::class,
@@ -37,7 +38,7 @@ class InventoryItem extends Model
             'pickup_available' => 'boolean',
             'shipping_available' => 'boolean',
             'exchange_available' => 'boolean',
-            'published_at' => 'immutable_datetime',
+            'submitted_at' => 'immutable_datetime', 'published_at' => 'immutable_datetime',
         ];
     }
 
@@ -64,6 +65,11 @@ class InventoryItem extends Model
     public function saleItems(): HasMany
     {
         return $this->hasMany(SaleItem::class);
+    }
+
+    public function publications(): HasMany
+    {
+        return $this->hasMany(StorePublication::class);
     }
 
     public function inventoryValueCents(): int

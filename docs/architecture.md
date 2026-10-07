@@ -65,3 +65,23 @@ Sessioni, cache e queue sono configurate su database; migration standard Laravel
 Lo schema effettivo è descritto in `database.md` e sostituisce i nomi e gli stati della proposta iniziale quando divergenti. Models/Enums/Policies/Factories sono presenti; `MoneyMath` e `WalletBalance` offrono calcoli esatti e letture del ledger. `RecordAdministrativeAction` è la primitiva di audit per le future Actions, che dovranno chiamarla nella propria transazione.
 
 L'associazione aziendale attuale è `User hasOne Retailer`, con `retailers.user_id` univoco. Una subscription attiva per rivenditore, con storico mantenuto. Nessun controller commerciale, quota, bonifico o webhook è ancora implementato. I limiti dei piani sono dati centralizzati, non condizioni sparse nei controller.
+
+## Flusso rivenditore implementato (Prompt 3)
+
+Registrazione atomica di account, azienda e subscription con scelta FREE/PRO. Partita IVA italiana a 11 cifre univoca; la verifica fiscale effettiva resta amministrativa. FREE è attivo immediatamente; PRO è richiesto/pending, senza addebiti o benefit attivi finché il futuro flusso pagamento non lo attiva. Approvazione aziendale indipendente dal piano: pending, rejected e suspended mantengono accesso a dashboard/profilo, mentre stock, vendita, richieste e credito richiedono approvazione tramite middleware e Policy. Nessuna gestione delle giacenze è introdotta in questa fase.
+
+Il profilo modifica esclusivamente i dati aziendali validati del proprietario, senza accettare stato, ownership o piano. IBAN cifrato, validazione checksum mod97 e visualizzazione limitata alle ultime quattro cifre: campo vuoto conserva il valore, nuovo valore lo sostituisce; escluso dai dati riproposti dopo errori. Le modifiche aziendali conservano lo stato di verifica attuale; una politica di nuova verifica per cambi di ragione sociale/IVA potrà essere introdotta esplicitamente.
+
+Dashboard con dati del solo proprietario: piano attivo/richiesto, commissione del piano attivo, numero/valore delle giacenze EUR non archiviate, ultime cinque richieste e credito disponibile dal ledger. Somme e formattazione monetaria senza float.
+
+Amministratore: elenco a card paginato, approvazione/rifiuto dei soli profili pending; rifiuto con motivazione obbligatoria. Action con lock, transazione, Policy e audit append-only; revisione duplicata rifiutata. Nessuna modifica al pagamento/attivazione subscription. Reinvio di iscrizioni rifiutate e sospensione sono fasi successive.
+
+## Gestione giacenze (Prompt 4)
+
+`InventoryRequest` valida il form; `InventoryRules` converte quantità/prezzi con Brick Math e applica quote/scambio/prezzi; `SaveInventoryItem` e `ReviewInventoryItem` gestiscono transazioni, ownership e transizioni. `InventoryPhotos` usa Symfony Process con argomenti separati e ImageMagick (binario configurabile), timeout e limiti di risorse. Policy copre creazione, modifica, archivio, lettura e revisione; il middleware aziendale blocca le operazioni non approvate. UI Blade/Alpine con preview locale, tabella desktop e card mobile. Nessun adapter ecommerce attivato. Dettagli e vincoli in database.md.
+
+## Pannello amministratore (Prompt 5)
+
+Accesso tramite auth + UserPolicy/accessAdministration, con Policy anche sulle azioni. Dashboard con conteggi e audit recente. Elenchi rivenditori/giacenze/bonifici a card responsive, paginazione server-side da 15 record e filtri validati per stato/azienda/intervallo data. Filtri conservati nella paginazione; nessun per_page arbitrario. Conferma tramite dialog nativo/Alpine, motivazioni obbligatorie per rifiuto/sospensione.
+
+ReviewRetailer gestisce anche approved→suspended; ReviewPayout registra esclusivamente esito di operazioni bancarie esterne e ledger. ReviewInventoryItem produce un’operazione durevole verso il gateway fittizio, elaborata fuori dalla transazione; dettagli in integrations.md. Audit include attore, tipo/ID entità, timestamp e snapshot essenziali, escludendo dati bancari e secrets.

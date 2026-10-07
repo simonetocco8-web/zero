@@ -122,3 +122,21 @@ php artisan test
 Factory per tutti i modelli, con stati rappresentativi (approved/rejected, published, active, contacted/closed, paid/rejected, processed, saleCredit/reservation). Dati demo soltanto tramite factory esplicite, mai seed automatico di account.
 
 La stessa suite va eseguita su un database MySQL di test dedicato (istruzioni nel README). Test su relazioni, enum, snapshot, seed, precisione/overflow, saldo/maturazione/riserve, ownership Policy e FK, unicità/idempotenza, immutabilità e cifratura. Nessun test usa servizi Stripe/ecommerce reali.
+
+## Giacenze e revisione (Prompt 4)
+
+`inventory_items` conserva i dati approvati nelle colonne standard. `proposed_data` e `proposed_images` (JSON interno, mai accettato dall’HTTP) conservano una sola proposta per la giacenza pubblicata. Le foto approvate restano nelle righe `inventory_images`; i file proposti restano privati. Approvazione promuove dati/foto in un’unica transazione, rifiuto di una modifica conserva il prodotto pubblicato, elimina la proposta e mostra la motivazione. Una nuova proposta sostituisce quella precedente. SKU resta univoco anche per giacenze archiviate.
+
+Bozza salvabile e invio in verifica esplicito. Archiviazione permessa solo per draft/pending/rejected mai pubblicati e senza ID esterno; pubblicati e change_pending richiederebbero un ritiro remoto, non implementato. La pubblicazione qui è locale: nessuna esportazione ecommerce reale.
+
+Quote dal piano attivo e temporalmente valido, contano tutte le giacenze non archiviate, incluse bozze/rifiutate. Valore esatto: somma di millesimi di quantità × centesimi, confrontata al limite × 1000 senza arrotondamento permissivo. Durante change_pending si riserva il massimo tra valore approvato e proposto; una proposta di riduzione non libera credito prima dell’approvazione. Tutte le scritture/archiviazioni/revisioni bloccano prima il rivenditore, poi subscription e giacenze. Letture bloccanti delle giacenze evitano snapshot precedenti al lock in MySQL REPEATABLE READ. I futuri cambi piano e movimenti di stock devono usare lo stesso ordine dei lock.
+
+Foto opzionali, massimo otto, 15 MB ciascuna; verifica MIME reale, decodifica solo JPEG/PNG/WebP, limite 40 megapixel per contenere risorse. ImageMagick auto-orienta (EXIF), ridimensiona lato lungo 1800, converte JPEG qualità 85, rimuove metadati/GPS e genera UUID. Foto nuove sostituiscono l’intero gruppo; nessun nuovo file mantiene quello esistente. Conversione prima del lock DB; file nuovi rimossi su rollback. File di versioni precedenti non più referenziate dopo moderazione restano privati: una futura pulizia periodica può rimuoverli con politica di conservazione esplicita. Le immagini vengono servite esclusivamente tramite route autenticata con Policy e cache privata, senza storage pubblico.
+
+## Amministrazione e bonifici (Prompt 5)
+
+Aggiunti `store_publications` (FK giacenza/amministratore, snapshot JSON, risultato, stato, timestamp, indice stato/data) e catalogo `fake_store_products` (ID univoco, revisione, dati e flag pubblicato). `inventory_items.submitted_at` traccia l’ultimo invio in verifica; per record precedenti la lista usa created_at come fallback.
+
+Bonifici pending: SEGNA COME PAGATO richiede riferimento della disposizione bancaria e IBAN, riserva negativa maturata esattamente pari all’importo e non già rilasciata/consumata. Nella stessa transazione: lock rivenditore/richiesta, payout_release positivo e payout negativo, stato paid, timestamp/reviewer e audit. Nessuna disposizione bancaria è eseguita. Rifiuto richiede motivazione e rilascia una riserva presente/coerente; una richiesta senza riserva può essere rifiutata ma non segnata pagata. Questo vincolo richiede che il futuro flusso di richiesta bonifico crei la riserva atomicamente. Operazioni duplicate non duplicano movimenti.
+
+Stato pagamento del piano: gratuito per FREE; non verificato per PRO perché non esistono eventi di pagamento/provider reale. Lo stato subscription non viene usato come prova di pagamento. Sospensione solo da approved, con motivazione e audit; blocca le operazioni del rivenditore, senza inventare un ritiro remoto dei prodotti.

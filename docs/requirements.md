@@ -48,3 +48,13 @@ Provider ecommerce, API/webhook disponibili, titolare della vendita e incasso, g
 ## Modello implementato (Prompt 2)
 
 Schema, enum, relazioni, factory e piani FREE/PRO sono implementati secondo `database.md`. Le schermate rimangono placeholder. I limiti dei piani sono memorizzati e configurabili; enforcement delle quote, moderazione, prenotazioni di credito e pagamento sono workflow futuri.
+
+## Flusso rivenditore implementato (Prompt 3)
+
+Registrazione atomica di account, azienda e subscription con scelta FREE/PRO. Partita IVA italiana a 11 cifre univoca; la verifica fiscale effettiva resta amministrativa. FREE è attivo immediatamente; PRO è richiesto/pending, senza addebiti o benefit attivi finché il futuro flusso pagamento non lo attiva. Approvazione aziendale indipendente dal piano: pending, rejected e suspended mantengono accesso a dashboard/profilo, mentre stock, vendita, richieste e credito richiedono approvazione tramite middleware e Policy. Nessuna gestione delle giacenze è introdotta in questa fase.
+
+Il profilo modifica esclusivamente i dati aziendali validati del proprietario, senza accettare stato, ownership o piano. IBAN cifrato, validazione checksum mod97 e visualizzazione limitata alle ultime quattro cifre: campo vuoto conserva il valore, nuovo valore lo sostituisce; escluso dai dati riproposti dopo errori. Le modifiche aziendali conservano lo stato di verifica attuale; una politica di nuova verifica per cambi di ragione sociale/IVA potrà essere introdotta esplicitamente.
+
+Dashboard con dati del solo proprietario: piano attivo/richiesto, commissione del piano attivo, numero/valore delle giacenze EUR non archiviate, ultime cinque richieste e credito disponibile dal ledger. Somme e formattazione monetaria senza float.
+
+Amministratore: elenco a card paginato, approvazione/rifiuto dei soli profili pending; rifiuto con motivazione obbligatoria. Action con lock, transazione, Policy e audit append-only; revisione duplicata rifiutata. Nessuna modifica al pagamento/attivazione subscription. Reinvio di iscrizioni rifiutate e sospensione sono fasi successive.

@@ -1,6 +1,13 @@
 <?php
 
+use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\AdminInventoryController;
+use App\Http\Controllers\AdminPayoutController;
+use App\Http\Controllers\AdminRetailerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\RetailerController;
+use App\Http\Middleware\EnsureApprovedRetailer;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
@@ -8,21 +15,34 @@ Route::view('/', 'welcome')->name('home');
 Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('dashboard');
 
 Route::middleware(['auth', 'can:accessRetailerArea,'.User::class])->prefix('retailer')->name('retailer.')->group(function (): void {
-    Route::view('dashboard', 'pages.placeholder', ['area' => 'retailer', 'title' => 'Dashboard', 'description' => 'Ritrova tutto, in un unico posto.', 'icon' => 'grid'])->name('dashboard');
-    Route::view('stock', 'pages.placeholder', ['area' => 'retailer', 'title' => 'Le mie giacenze', 'description' => 'Le tue giacenze, sempre sotto controllo.', 'icon' => 'box'])->name('stock');
-    Route::view('sell', 'pages.placeholder', ['area' => 'retailer', 'title' => 'Metti in vendita', 'description' => 'Dai una nuova opportunità ai tuoi materiali.', 'icon' => 'plus'])->name('sell');
-    Route::view('requests', 'pages.placeholder', ['area' => 'retailer', 'title' => 'Richieste', 'description' => 'Un filo diretto con chi cerca i tuoi materiali.', 'icon' => 'chat'])->name('requests');
-    Route::view('credit', 'pages.placeholder', ['area' => 'retailer', 'title' => 'Credito', 'description' => 'Una visione chiara del tuo credito.', 'icon' => 'wallet'])->name('credit');
-    Route::view('profile', 'pages.placeholder', ['area' => 'retailer', 'title' => 'Profilo', 'description' => 'Il tuo spazio su ZeroMagazzino.', 'icon' => 'user'])->name('profile');
+    Route::get('dashboard', [RetailerController::class, 'dashboard'])->name('dashboard');
+    Route::middleware(EnsureApprovedRetailer::class)->group(function () {
+        Route::get('stock', [InventoryController::class, 'index'])->name('stock');
+        Route::get('sell', [InventoryController::class, 'create'])->name('sell');
+        Route::post('stock', [InventoryController::class, 'store'])->middleware('throttle:20,1')->name('stock.store');
+        Route::get('stock/{item}', [InventoryController::class, 'show'])->name('stock.show');
+        Route::get('stock/{item}/edit', [InventoryController::class, 'edit'])->name('stock.edit');
+        Route::put('stock/{item}', [InventoryController::class, 'update'])->middleware('throttle:20,1')->name('stock.update');
+        Route::patch('stock/{item}/archive', [InventoryController::class, 'archive'])->name('stock.archive');
+    });
+    Route::view('requests', 'pages.placeholder', ['area' => 'retailer', 'title' => 'Richieste', 'description' => 'Un filo diretto con chi cerca i tuoi materiali.', 'icon' => 'chat'])->middleware(EnsureApprovedRetailer::class)->name('requests');
+    Route::view('credit', 'pages.placeholder', ['area' => 'retailer', 'title' => 'Credito', 'description' => 'Una visione chiara del tuo credito.', 'icon' => 'wallet'])->middleware(EnsureApprovedRetailer::class)->name('credit');
+    Route::get('profile', [RetailerController::class, 'profile'])->name('profile');
+    Route::put('profile', [RetailerController::class, 'update'])->middleware('throttle:20,1')->name('profile.update');
 });
 
 Route::middleware(['auth', 'can:accessAdministration,'.User::class])->prefix('admin')->name('admin.')->group(function (): void {
-    Route::view('dashboard', 'pages.placeholder', ['area' => 'admin', 'title' => 'Dashboard', 'description' => 'La piattaforma, a colpo d’occhio.', 'icon' => 'grid'])->name('dashboard');
-    Route::view('retailers', 'pages.placeholder', ['area' => 'admin', 'title' => 'Rivenditori', 'description' => 'Una rete di aziende da seguire.', 'icon' => 'users'])->name('retailers');
-    Route::view('stock', 'pages.placeholder', ['area' => 'admin', 'title' => 'Giacenze', 'description' => 'Qualità e controllo prima della pubblicazione.', 'icon' => 'box'])->name('stock');
-    Route::view('payouts', 'pages.placeholder', ['area' => 'admin', 'title' => 'Bonifici', 'description' => 'Segui le richieste di pagamento.', 'icon' => 'wallet'])->name('payouts');
+    Route::get('dashboard', AdminDashboardController::class)->name('dashboard');
+    Route::get('retailers', [AdminRetailerController::class, 'index'])->name('retailers');
+    Route::patch('retailers/{retailer}/review', [AdminRetailerController::class, 'review'])->middleware('throttle:20,1')->name('retailers.review');
+    Route::get('stock', [AdminInventoryController::class, 'index'])->name('stock');
+    Route::patch('stock/{item}/review', [AdminInventoryController::class, 'review'])->middleware('throttle:20,1')->name('stock.review');
+    Route::get('payouts', [AdminPayoutController::class, 'index'])->name('payouts');
+    Route::patch('payouts/{payout}/review', [AdminPayoutController::class, 'review'])->middleware('throttle:20,1')->name('payouts.review');
     Route::view('settings', 'pages.placeholder', ['area' => 'admin', 'title' => 'Impostazioni', 'description' => 'Le preferenze della piattaforma.', 'icon' => 'settings'])->name('settings');
 });
+
+Route::get('inventory/{item}/photos/{position}', [InventoryController::class, 'image'])->middleware('auth')->whereNumber('position')->name('inventory.image');
 
 if (app()->environment('local')) {
     Route::view('/design-system', 'pages.design-system')->middleware('auth')->name('design-system');

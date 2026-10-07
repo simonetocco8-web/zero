@@ -55,3 +55,11 @@ Confermare provider e sandbox, limiti API, autenticazione, firma webhook, idempo
 `integration_events` contiene receipt univoche per provider/evento, con hash raw, payload cifrato opzionale e stato di elaborazione. `wallet_transactions.idempotency_key` impedisce effetti finanziari duplicati. Sono soltanto primitive dati: la firma webhook, l'intake transazionale e i worker non sono ancora implementati.
 
 Nel vocabolario inventario richiesto, `published` deve rappresentare la pubblicazione completata; il futuro adapter deve distinguere approvazione locale, conferma remota e fallimento attraverso il workflow e lo stato dell'operazione di integrazione. La tabella outbox `integration_operations` proposta sopra non è ancora creata. Per modifiche `change_pending` resta da definire una versione approvata immutabile o il ritiro dell'offerta precedente.
+
+## Gateway fittizio implementato (Prompt 5)
+
+`StoreGatewayInterface` espone createProduct, updateProduct e publishProduct. Il container lega esclusivamente `FakeStoreGateway`: nessuna chiamata a provider reali. Il catalogo simulato vive in `fake_store_products`; ID deterministico per giacenza e revisione crescente rendono create/retry idempotenti e impediscono a una revisione vecchia di sovrascrivere la nuova.
+
+L’approvazione scrive `store_publications` nella stessa transazione di promozione della giacenza, con snapshot dei dati/foto. `ProcessStorePublication` esegue il gateway dopo commit, registra risultato oppure codice d’errore generico, salva provider/ID e audit di pubblicazione. Attualmente dispatchSync è appropriato solo per il fake locale; un futuro provider reale richiederà dispatch asincrono, timeout/retry/firma e riconciliazione. Non inserire chiamate remote nelle transazioni di approvazione.
+
+`php artisan store:sync` recupera operazioni pending/failed e processing ferme da almeno cinque minuti. È un comando operativo interno, senza endpoint pubblico. Un errore di sincronizzazione non annulla l’approvazione locale: lo stato della pubblicazione è separato e visibile in amministrazione. Snapshot e risultato non contengono IBAN, credenziali o payload cliente.
