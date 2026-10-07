@@ -9,6 +9,11 @@ use Illuminate\Support\Facades\Gate;
 
 class PayoutRequestPolicy
 {
+    public function create(User $user): bool
+    {
+        return $user->retailer && Gate::forUser($user)->allows('operate', $user->retailer);
+    }
+
     public function review(User $user, PayoutRequest $payoutRequest): bool
     {
         return $user->role === UserRole::Admin;

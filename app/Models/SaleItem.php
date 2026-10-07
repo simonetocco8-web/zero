@@ -20,7 +20,7 @@ class SaleItem extends Model
 
     protected $attributes = ['unit' => 'piece', 'currency' => 'EUR'];
 
-    protected $fillable = ['sale_id', 'inventory_item_id', 'retailer_id', 'external_line_id', 'name', 'sku', 'unit', 'quantity', 'quantity_milliunits', 'currency', 'unit_price_cents', 'line_total_cents', 'commission_basis_points', 'commission_cents'];
+    protected $fillable = ['sale_id', 'inventory_item_id', 'retailer_id', 'external_line_id', 'name', 'sku', 'unit', 'quantity', 'quantity_milliunits', 'currency', 'unit_price_cents', 'line_total_cents', 'commission_basis_points', 'commission_cents', 'discount_cents', 'net_cents'];
 
     protected function casts(): array
     {
@@ -31,6 +31,8 @@ class SaleItem extends Model
             'line_total_cents' => ExactIntegerCast::class,
             'commission_basis_points' => ExactIntegerCast::class,
             'commission_cents' => ExactIntegerCast::class,
+            'discount_cents' => ExactIntegerCast::class,
+            'net_cents' => ExactIntegerCast::class,
         ];
     }
 

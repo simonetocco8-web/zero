@@ -36,7 +36,7 @@ class FakeStoreGateway implements StoreGatewayInterface
                 $product->update(['published' => true]);
             }
 
-return ['provider' => 'fake', 'external_product_id' => $externalId, 'published' => $product->published, 'revision' => $product->revision, 'simulated' => true];
+            return ['provider' => 'fake', 'external_product_id' => $externalId, 'published' => $product->published, 'revision' => $product->revision, 'simulated' => true];
         });
     }
 }

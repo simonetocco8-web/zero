@@ -1,7 +1,7 @@
 <x-layouts.retailer title="Dashboard"><h1 class="mb-5">Dashboard</h1><x-retailer-status :retailer="$retailer" />
 @if($requested && $requested->status->value === 'pending')<x-alert class="mt-4" title="Piano richiesto: {{ $requested->plan->name }}">L’attivazione del piano a pagamento è separata dalla verifica aziendale. Nessun pagamento è stato effettuato.</x-alert>@endif
 <div class="mt-6 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-@foreach(['Piano attivo'=>$plan?->name ?? 'Nessun piano attivo','Prodotti'=>$productCount,'Valore magazzino'=>\App\Support\DisplayMoney::euros($inventoryValue),'Commissione corrente'=>$plan ? \App\Support\DisplayMoney::percent($plan->commission_basis_points) : 'In attesa di attivazione','Credito disponibile'=>\App\Support\DisplayMoney::euros($credit)] as $label=>$value)
+@foreach(['Piano attivo'=>$plan?->name ?? 'Nessun piano attivo','Prodotti'=>$productCount,'Richieste nuove'=>$newRequestCount,'Valore magazzino'=>\App\Support\DisplayMoney::euros($inventoryValue),'Commissione corrente'=>$plan ? \App\Support\DisplayMoney::percent($plan->commission_basis_points) : 'In attesa di attivazione','Credito disponibile'=>\App\Support\DisplayMoney::euros($credit)] as $label=>$value)
 <x-card><p class="text-sm text-slate-500">{{ $label }}</p><p class="mt-2 break-words text-xl font-semibold">{{ $value }}</p></x-card>@endforeach
 </div>
 <p class="mt-3 text-sm text-slate-500">Valori in EUR; le giacenze archiviate sono escluse.</p>

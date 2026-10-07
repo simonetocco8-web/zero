@@ -63,3 +63,53 @@ Nel vocabolario inventario richiesto, `published` deve rappresentare la pubblica
 L’approvazione scrive `store_publications` nella stessa transazione di promozione della giacenza, con snapshot dei dati/foto. `ProcessStorePublication` esegue il gateway dopo commit, registra risultato oppure codice d’errore generico, salva provider/ID e audit di pubblicazione. Attualmente dispatchSync è appropriato solo per il fake locale; un futuro provider reale richiederà dispatch asincrono, timeout/retry/firma e riconciliazione. Non inserire chiamate remote nelle transazioni di approvazione.
 
 `php artisan store:sync` recupera operazioni pending/failed e processing ferme da almeno cinque minuti. È un comando operativo interno, senza endpoint pubblico. Un errore di sincronizzazione non annulla l’approvazione locale: lo stato della pubblicazione è separato e visibile in amministrazione. Snapshot e risultato non contengono IBAN, credenziali o payload cliente.
+
+## Richieste di disponibilità (Prompt 6)
+
+Form pubblico GET/POST `/products/{item}/request`, senza autenticazione ma con sessione e CSRF. Il negozio può collegare questa URL, inclusa nei nuovi snapshot gateway come availability_request_url; usare un link alla pagina, senza disabilitare CSRF per POST cross-origin. Nessuna API di raccolta pubblica o esposizione dei contatti.
+
+Disponibile solo per published/change_pending con published_at e rivenditore approved; anche change_pending usa esclusivamente la versione approvata. POST ricontrolla prodotto/rivenditore sotto lock, ricava l’ownership dal database, forza stato new e data consenso server-side. Richiesta non equivale ad acquisto o prenotazione e può chiedere più della quantità esposta.
+
+Campi aggiunti: customer_company, quantity_milliunits interi, privacy_accepted_at e privacy_policy_version. I record storici mantengono null per quantità/consenso, senza inventare evidenze retroattive. Quantità strettamente positiva, fino a tre decimali; nome/email obbligatori; campi testo senza markup e con limiti di lunghezza; Blade esegue escaping. Honeypot contact_website obbligatoriamente vuoto; 5 POST/minuto e 20/ora per IP, condivisi fra prodotti, includendo tentativi non validi. Nessun IP memorizzato nella richiesta. Configurare trusted proxy solo quando verificato dal deployment.
+
+Privacy: consenso obbligatorio e versione dell’informativa configurabile tramite PRIVACY_POLICY_VERSION. PRIVACY_POLICY_URL sostituisce la pagina informativa interna: l’informativa definitiva deve indicare identità del titolare, recapiti, conservazione e diritti per il deployment effettivo. Dati personali nascosti dalla serializzazione generica, consultabili solo nella lista autenticata del proprietario; header private/no-store. Nessuna comunicazione o marketing automatico.
+
+Pagina rivenditore paginata da 15 richieste, card mobile e tabella desktop; modifica consentita soltanto allo stato (new/contacted/closed) con Policy, middleware, CSRF e lock. Timestamp contatto conservato come storico; chiusura impostata entrando in closed e rimossa riaprendo. Dashboard conta richieste nuove e mostra le ultime cinque del solo proprietario.
+
+## Contratto economico interno (Prompt 7)
+
+Nessun webhook HTTP o provider reale aggiunto. Un adapter futuro deve verificare firma/timestamp sul corpo raw prima di chiamare il servizio; il servizio non autentica un payload proveniente dalla rete. La commissione deriva dal piano registrato in DB valido alla data vendita (subscription.starts_at/ends_at/cancelled_at), non da campi forniti dall’evento. Conservare la cronologia delle sottoscrizioni. Un evento senza un piano storico valido è rifiutato. Modifiche future ai prezzi/aliquote dei piani richiedono una politica di versionamento per eventi storici non ancora acquisiti; le vendite già acquisite mantengono sempre lo snapshot.
+
+Esempio di chiamata interna, importi esclusivamente in centesimi interi, quantità stringa decimale fino a tre cifre:
+
+```php
+$sale = app(\App\Services\SaleAccounting::class)->recordSale([
+    'provider' => 'fake',
+    'external_order_id' => 'ordine-123',
+    'external_event_id' => 'pagamento-123', // opzionale
+    'timestamp' => '2026-10-07T10:00:00Z',
+    'currency' => 'EUR', // unica valuta supportata, default EUR
+    'items' => [[
+        'external_line_id' => 'riga-1',
+        'inventory_item_id' => $product->id,
+        'retailer_id' => $product->retailer_id,
+        'quantity' => '2.000',
+        'unit_price_cents' => 10000,
+        'discount_cents' => 1000, // opzionale, default 0
+    ]],
+]);
+// FREE: lordo 19000, commissione 380, netto 18620 centesimi.
+
+app(\App\Services\SaleAccounting::class)->refund([
+    'provider' => 'fake',
+    'external_order_id' => 'ordine-123',
+    'external_refund_id' => 'rimborso-123',
+    'external_event_id' => 'evento-rimborso-123', // opzionale
+    'timestamp' => '2026-10-08T10:00:00Z',
+    'items' => [['external_line_id' => 'riga-1', 'amount_cents' => 19000]],
+]);
+```
+
+Ordini multi-rivenditore sono supportati con credito distinto per riga/proprietario. Il caller è un servizio interno fidato; proprietà prodotto/rivenditore verificata e vincolata dal DB. Gli identificativi ordine/riga/rimborso devono essere stabili e i replay conservare timestamp/dati originali; il riuso con contenuti diversi è errore. È accettato un alias external_event_id per lo stesso ordine/rimborso senza ripetere gli effetti. Rimborsi prima della vendita vengono rifiutati e devono essere ritentati dopo l’acquisizione della vendita dall’adapter futuro. Eventi/hash/payload conservati localmente, nessuna notifica esterna automatica.
+
+Il rimborso riguarda importi lordi della riga e restituisce la commissione pro quota; trasporto/tasse/commissioni non rimborsabili non sono modellati. CREDIT_MATURATION_DAYS regola la disponibilità dalla data della vendita; il rimborso diventa effettivo non prima del credito originale. Decidere questi aspetti prima dell’uso con denaro reale.

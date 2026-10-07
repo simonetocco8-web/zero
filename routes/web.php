@@ -4,6 +4,8 @@ use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminInventoryController;
 use App\Http\Controllers\AdminPayoutController;
 use App\Http\Controllers\AdminRetailerController;
+use App\Http\Controllers\AvailabilityController;
+use App\Http\Controllers\CreditController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\RetailerController;
@@ -12,6 +14,9 @@ use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+Route::get('products/{item}/request', [AvailabilityController::class, 'create'])->name('availability.create');
+Route::post('products/{item}/request', [AvailabilityController::class, 'store'])->middleware('throttle:availability')->name('availability.store');
+Route::view('privacy', 'availability.privacy')->name('privacy');
 Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('dashboard');
 
 Route::middleware(['auth', 'can:accessRetailerArea,'.User::class])->prefix('retailer')->name('retailer.')->group(function (): void {
@@ -25,8 +30,10 @@ Route::middleware(['auth', 'can:accessRetailerArea,'.User::class])->prefix('reta
         Route::put('stock/{item}', [InventoryController::class, 'update'])->middleware('throttle:20,1')->name('stock.update');
         Route::patch('stock/{item}/archive', [InventoryController::class, 'archive'])->name('stock.archive');
     });
-    Route::view('requests', 'pages.placeholder', ['area' => 'retailer', 'title' => 'Richieste', 'description' => 'Un filo diretto con chi cerca i tuoi materiali.', 'icon' => 'chat'])->middleware(EnsureApprovedRetailer::class)->name('requests');
-    Route::view('credit', 'pages.placeholder', ['area' => 'retailer', 'title' => 'Credito', 'description' => 'Una visione chiara del tuo credito.', 'icon' => 'wallet'])->middleware(EnsureApprovedRetailer::class)->name('credit');
+    Route::get('requests', [AvailabilityController::class, 'index'])->middleware(EnsureApprovedRetailer::class)->name('requests');
+    Route::patch('requests/{availabilityRequest}', [AvailabilityController::class, 'update'])->middleware([EnsureApprovedRetailer::class, 'throttle:30,1'])->name('requests.update');
+    Route::get('credit', [CreditController::class, 'index'])->middleware(EnsureApprovedRetailer::class)->name('credit');
+    Route::post('credit/payout', [CreditController::class, 'store'])->middleware([EnsureApprovedRetailer::class, 'throttle:5,1'])->name('credit.payout');
     Route::get('profile', [RetailerController::class, 'profile'])->name('profile');
     Route::put('profile', [RetailerController::class, 'update'])->middleware('throttle:20,1')->name('profile.update');
 });

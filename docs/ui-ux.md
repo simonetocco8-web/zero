@@ -42,3 +42,7 @@ Componenti in `resources/views/components`: `button` (primary/secondary/danger),
 Layout `components/layouts/retailer.blade.php` e `admin.blade.php` condividono `area-shell`. Sidebar da 1024 px; sotto tale soglia header compatto e bottom navigation rivenditore a tre colonne/due righe, con spazio finale e safe area. Amministratore con menu mobile che va a capo. Le pagine commerciali mostrano esplicitamente lo stato «In preparazione», senza saldi o dati inventati.
 
 `modal` usa un `<dialog>` nativo: focus vincolato, Escape e ritorno al pulsante di apertura. `toast` riceve l'evento Alpine `toast` con messaggio testuale, offre chiusura esplicita e non scompare automaticamente. `field` associa errori e suggerimenti al campo. Galleria locale autenticata `/design-system` per verificare varianti e interazioni.
+
+## Credito (Prompt 7)
+
+Metriche e storici in card responsive, nessuna tabella larga; layout rivenditore e navigazione mobile esistenti. Storici vendite, movimenti e bonifici con paginatori indipendenti server-side. Lordo/sconto/commissione snapshot/netto distinti, stato vendita e stato bonifico con testo, indicazione movimenti non ancora disponibili. IBAN mostra solo ultime quattro posizioni. Azione “RICEVI IL BONIFICO” disabilitata se credito non positivo, IBAN mancante o richiesta pendente; controlli equivalenti server-side. Feedback visibile dopo POST, errori di validazione, link al profilo per completare IBAN. Opzione acquisti futuri solo informativa.
