@@ -14,7 +14,7 @@ class FakeMarketplacePaymentGateway implements ExchangePaymentGatewayInterface, 
     {
         app(MarketplaceEconomicRules::class)->exchange();
 
-        return ['provider' => 'fake_marketplace', 'reference' => 'fake-exchange-'.hash('sha256', $idempotencyKey), 'status' => 'payment_pending', 'amount_cents' => $version->difference_cents, 'currency' => $version->currency, 'simulated' => true];
+        return ['provider' => 'fake_marketplace', 'reference' => 'fake-exchange-'.hash('sha256', $idempotencyKey), 'status' => 'payment_pending', 'amount_cents' => $version->payment()->value('card_cents') ?? $version->difference_cents, 'currency' => $version->currency, 'simulated' => true];
     }
 
     public function createIntent(Order $order, string $idempotencyKey): array

@@ -11,7 +11,7 @@ Il cliente paga una sola volta alla piattaforma; un Order contiene N VendorOrder
 - Billing abbonamenti PRO e marketplace usano contratti, chiavi/configurazione e webhook distinti.
 - Commissioni snapshot 200/50 bp vendite e 50 bp conguaglio al ricevente. Nessun fee di vendita applicato al valore merci dello scambio.
 - Incasso, allocazione, trasferimento, payout, rimborso e recupero sono eventi distinti con chiavi provider/idempotenti e audit append-only.
-- Saldo retailer liquidabile, mai spendibile al lancio. Bonus customer è un ledger promozionale separato finanziato dalla piattaforma.
+- Correzione vincolante successiva del committente (16 ottobre 2026): credito retailer già maturato spendibile su acquisti e conguagli, anche in combinazione con carta; checkout 30 minuti. Sostituisce il precedente divieto del PDF, preservando Connect e le commissioni approvate. Bonus customer in ledger promozionale separato finanziato dalla piattaforma.
 - Maturazione dopo consegna documentata/OTP +72h, assenza contestazioni e fondi provider disponibili; bonifici automatici lunedì. Queste condizioni non limitano diritti di recesso/garanzia.
 - La piattaforma risponde tecnicamente di costi PSP/rimborsi/contestazioni sul proprio saldo. Recuperi dal seller distinti dal rimborso cliente; non presumere reversal automatici.
 

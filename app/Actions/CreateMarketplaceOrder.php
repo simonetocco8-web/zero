@@ -10,6 +10,7 @@ use App\Services\CustomerPromotionalBonus;
 use App\Services\MarketplaceCart;
 use App\Services\MarketplaceNotices;
 use App\Services\MarketplaceQuote;
+use App\Services\RetailerCredit;
 use App\Services\StockReservations;
 use App\Support\ProportionalAllocation;
 use Illuminate\Support\Facades\DB;
@@ -17,11 +18,11 @@ use Illuminate\Support\Facades\Gate;
 
 class CreateMarketplaceOrder
 {
-    public function handle(User $user, string $key, array $modes, ?int $addressId, string $reviewHash, bool $useBonus = false): Order
+    public function handle(User $user, string $key, array $modes, ?int $addressId, string $reviewHash, bool $useBonus = false, bool $useCredit = true): Order
     {
         Gate::forUser($user)->authorize('purchase', User::class);
 
-        return DB::transaction(function () use ($user, $key, $modes, $addressId, $reviewHash, $useBonus) {
+        return DB::transaction(function () use ($user, $key, $modes, $addressId, $reviewHash, $useBonus, $useCredit) {
             User::lockForUpdate()->findOrFail($user->id);
             $existing = Order::where('checkout_key', $key)->first();
             if ($existing) {
@@ -31,7 +32,7 @@ class CreateMarketplaceOrder
             }
             $cart = app(MarketplaceCart::class)->cart($user);
             $ids = $cart->items()->pluck('inventory_item_id');
-            $retailers = InventoryItem::whereIn('id', $ids)->orderBy('retailer_id')->pluck('retailer_id')->unique();
+            $retailers = InventoryItem::whereIn('id', $ids)->orderBy('retailer_id')->pluck('retailer_id')->push($user->retailer?->id)->filter()->unique()->sort();
             foreach ($retailers as $id) {
                 Retailer::whereKey($id)->lockForUpdate()->firstOrFail();
             }
@@ -49,10 +50,13 @@ class CreateMarketplaceOrder
                     $vendor->items()->create($line);
                 }
             }
+            $credit = app(RetailerCredit::class)->reserve($order, $useCredit);
             $bonus = app(CustomerPromotionalBonus::class)->reserve($order, $useBonus);
             $weights = $order->vendorOrders()->orderBy('id')->get()->mapWithKeys(fn ($v) => [$v->id => $v->total_cents - $v->shipping_cents])->all();
             $allocations = ProportionalAllocation::split($bonus, $weights);
-            $order->payment()->create(['bonus_cents' => $bonus, 'card_cents' => $order->total_cents - $bonus, 'funding_snapshot' => ['policy' => 'customer_bonus_v1', 'goods_limit_basis_points' => config('marketplace.bonus.maximum_goods_basis_points'), 'platform_funded_bonus_cents' => $bonus, 'bonus_by_vendor' => $allocations], 'provider' => 'fake_marketplace', 'amount_cents' => $order->total_cents, 'currency' => 'EUR', 'simulated' => true]);
+            $creditWeights = $order->vendorOrders()->orderBy('id')->get()->mapWithKeys(fn ($v) => [$v->id => $v->total_cents])->all();
+            $creditAllocations = ProportionalAllocation::split($credit, $creditWeights);
+            $order->payment()->create(['retailer_credit_cents' => $credit, 'bonus_cents' => $bonus, 'card_cents' => $order->total_cents - $bonus - $credit, 'funding_snapshot' => ['retailer_credit_policy' => 'matured_ledger_v1', 'retailer_credit_cents' => $credit, 'credit_by_vendor' => $creditAllocations, 'card_by_vendor' => collect($creditWeights)->map(fn ($amount, $id) => $amount - $creditAllocations[$id] - $allocations[$id])->all(), 'policy' => 'customer_bonus_v1', 'goods_limit_basis_points' => config('marketplace.bonus.maximum_goods_basis_points'), 'platform_funded_bonus_cents' => $bonus, 'bonus_by_vendor' => $allocations], 'provider' => 'fake_marketplace', 'amount_cents' => $order->total_cents, 'currency' => 'EUR', 'simulated' => true]);
             app(StockReservations::class)->reserveOrder($order);
             $cart->items()->delete();
             app(MarketplaceNotices::class)->orderReceived($order);

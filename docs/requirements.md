@@ -1,5 +1,13 @@
 # Requisiti di ZeroMagazzino
 
+## Correzione vincolante credito retailer — 16 ottobre 2026
+
+L'istruzione successiva del committente prevale sul precedente divieto di spesa del PDF: il retailer può spendere credito **già maturato** per acquisti e conguagli, integralmente o insieme alla carta. Il bonus customer rimane separato e non soddisfa questo requisito.
+
+Prenotazione atomica del credito insieme allo stock, consumo solo al successo, rilascio su fallimento/annullamento/scadenza e rimborso al ledger originario; nessun doppio consumo o saldo mutabile. Nel multi-vendor conservare snapshot deterministico delle quote credito/carta. Totale economico = credito + carta. Conguaglio: accredito dell'intera differenza al ricevente, commissione 50 bp sulla differenza totale.
+
+`MARKETPLACE_RETAILER_CREDIT_ENABLED=true` per default; esecuzione economica comunque bloccata con `MARKETPLACE_EXECUTION_MODE=disabled`. Checkout **30 minuti**, configurato con `MARKETPLACE_RESERVATION_MINUTES`, senza costanti nel dominio né estensione delle riserve storiche. Fondi reali e simulati separati. Contratto implementativo, refund e limiti di attivazione in [marketplace-payments.md](marketplace-payments.md).
+
 ## APPROVED — decisioni pagamenti v1.0 del 14 ottobre 2026
 
 Fonte: PDF del committente `ZeroMagazzino_Decisioni_Pagamenti_Credito.pdf`, ricevuto il 16 ottobre 2026. Sostituisce i precedenti DA DEFINIRE per i temi trattati. Il documento fornisce decisioni commerciali; i suoi riferimenti normativi non costituiscono una validazione legale o fiscale.
@@ -9,9 +17,9 @@ Fonte: PDF del committente `ZeroMagazzino_Decisioni_Pagamenti_Credito.pdf`, rice
 - Costi PSP separati, a carico del beneficiario, proporzionali agli importi incassati nei carrelli multipli. IVA servizio eventualmente aggiuntiva; aliquote e regimi configurabili, da validare con il commercialista. Nessun 22% implicito.
 - Conguaglio sui totali merce IVA inclusa dopo sconti; trasporti e commissioni separati. Due cessioni documentate nello scambio.
 - Trasporto vendite al compratore salvo offerta; negli scambi al destinatario, deroghe versionate e accettate da entrambi.
-- Checkout: 15 minuti; carrello senza riserva. Proposta scambio: 48 ore senza riserva. Dopo doppia accettazione: conguaglio 1440 minuti; senza differenza impegno immediato. Scadenza libera stock, pagamento tardivo in riconciliazione.
+- Checkout: 30 minuti; carrello senza riserva. Proposta scambio: 48 ore senza riserva. Dopo doppia accettazione: conguaglio 1440 minuti; senza differenza impegno immediato. Scadenza libera stock, pagamento tardivo in riconciliazione.
 - Prima del corriere: rimborso integrale, storno commissione, costi PSP non restituiti al venditore. Dopo spedizione: workflow distinto B2B/B2C, recesso consumatore 14 giorni salvo eccezioni; nessun automatismo che escluda diritti. Scambio già consegnato anche solo da un lato: gestione assistita coordinata.
-- Saldo retailer append-only alimentato da vendite/conguagli, liquidabile ma **non spendibile** al lancio. Pending → liquidabile dopo consegna documentata o ritiro OTP +72 ore, senza contestazioni e con fondi PSP disponibili. Liquidazioni lunedì; anticipi entro limiti provider. Recovery separata, debito visibile anche negativo.
+- Saldo retailer append-only alimentato da vendite/conguagli, liquidabile e **spendibile quando maturato**, su acquisti e conguagli, anche con carta; correzione vincolante del committente del 16 ottobre 2026. Pending → liquidabile dopo consegna documentata o ritiro OTP +72 ore, senza contestazioni e con fondi PSP disponibili. Liquidazioni lunedì; anticipi entro limiti provider. Recovery separata, debito visibile anche negativo.
 - Bonus customer separato e finanziato dalla piattaforma: personale, non trasferibile/prelevabile/ricaricabile; validità 12 mesi, massimo 10% merce, esclusi trasporto e conguaglio. Il venditore riceve il prezzo concordato; rimborso monetario sul metodo originario e ripristino bonus.
 
 **Attivazione distinta dall'approvazione commerciale:** verifica disponibilità/configurazione Connect con Stripe e validazione fiscale restano prerequisiti. Nessuna chiamata live o liquidazione autorizzata dall'inserimento delle regole. Stato implementativo e limiti in [marketplace-payments.md](marketplace-payments.md) e [ADR](adr/marketplace-funds-flow.md). Le sezioni storiche sotto non prevalgono su queste decisioni.
@@ -28,11 +36,9 @@ Aree cliente, vendite retailer e registri admin integrate con ownership e pagina
 
 Exchange, versioni/righe immutabili e sigillate, doppia acceptance sulla versione corrente, conguaglio merci separato da trasporto/IVA/commissioni, stock condiviso con gli acquisti, gateway fake, scadenza, completamento reciproco e area Scambi sono ora implementati. Solo retailer PRO attivi e approved negoziano; fiscalità irrisolta impedisce l'incasso simulato. Migration additiva, nessun pagamento reale o Stripe Connect. Le sezioni storiche che indicano Exchange PLANNED sono superate da questo stato: dettagli e limiti in [exchanges.md](exchanges.md).
 
-
 ## EXISTING — prenotazioni stock, stato aggiornato
 
 Checkout e pagamento fake utilizzano ora StockReservation nel database: disponibilità fisica meno prenotazioni attive non scadute, lock ordinati, consumo/rilascio atomici, idempotenza checkout/intent/eventi e scadenza schedulabile. IVA indefinita continua a impedire l'incasso simulato. Le precedenti sezioni che indicano reservation PLANNED o assente descrivono lo stato storico, superato da questa implementazione. Contratti, TTL di sviluppo, limiti e verifica in [stock-reservations.md](stock-reservations.md).
-
 
 ## EXISTING — carrello e ordini simulati
 
@@ -68,7 +74,7 @@ La destinazione del prodotto è un marketplace B2B/B2C integrato in **un solo mo
 | Moderazione | Approva e promuove proposta/foto in transazione, imposta `published`, crea sempre StorePublication; il fake è elaborato dopo commit in modo sincrono | `ReviewInventoryItem`, `ProcessStorePublication`, `AdminPanelTest` |
 | Pubblico | Home introduttiva e richiesta GET/POST `/products/{item}/request`, privacy, CSRF, antispam. Solo prodotto published/change_pending con published_at e azienda approved | `routes/web.php`, `PublicInventory`, `AvailabilityFlowTest` |
 | Vendite | Incassi confermati di adapter fidati, righe multi-rivenditore, snapshot di commissione, rimborsi idempotenti. Non sono un checkout | `SaleAccounting`, `SaleAccountingTest` |
-| Wallet e payout | Ledger append-only, maturazione, riserva dell'intero credito EUR, esito bancario amministrativo. Nessun pagamento bancario automatico o credito spendibile al checkout | `WalletBalance`, `RequestPayout`, `ReviewPayout`, `FinanceConcurrencyTest` |
+| Wallet e payout | Ledger append-only, maturazione, riserva dell'intero credito EUR, esito bancario amministrativo. Nessun pagamento bancario automatico; credito già maturato spendibile al checkout e nei conguagli, anche con carta | `WalletBalance`, `RequestPayout`, `ReviewPayout`, `FinanceConcurrencyTest` |
 | PRO | Checkout Stripe ricorrente, webhook/queue, riconciliazione, entitlement e downgrade FREE. Il pagamento non approva l'azienda | `Services/Billing`, `ExternalIntegrationsTest`, `StripeSdkGatewayTest` |
 | Store esterno | Contratto create/update/publish/archive, fake locale, receipt order.paid/refund firmate. Nessun provider reale | `StoreGatewayInterface`, `FakeStoreGateway`, `FakeStoreWebhook` |
 | Audit/deployment | Audit amministrativo append-only, CI e pacchetto cPanel con installer temporaneo per prima installazione | `RecordAdministrativeAction`, `DomainModelTest`, `ManualDeploymentTest`, `DeployPackageTest` |
@@ -129,7 +135,7 @@ Notification introduce avvisi in-app e, se previsto, mail dopo commit, con desti
 | Guest checkout e account con più capacità | Customer, autenticazione, storico ordini e migrazione dei ruoli |
 | Scambio: partecipanti, valuation e completamento | Benefit richiesti a entrambi i lati, logistica, annullamento, valore giuridico dell'accettazione |
 | Spedizione/ritiro e sospensioni/downgrade | Costi/stati di evasione e gestione impegni esistenti quando il venditore non può più operare |
-| Wallet spendibile e credito di scambio | Regole di disponibilità, compensazione e concorrenza col payout; il wallet attuale non autorizza acquisti |
+| Wallet spendibile e credito di scambio | IMPLEMENTATO: credito maturato da ledger, reservation/spend/release/refund, combinazione carta e concorrenza col payout; rollout live soggetto ai prerequisiti provider |
 | Retention e notifiche | Consensi/privacy B2C, dati fiscali, canali e durata delle evidenze |
 
 Queste decisioni non bloccano audit/documentazione o catalogo in sola lettura; precedono le funzionalità economiche coinvolte.

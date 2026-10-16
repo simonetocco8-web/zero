@@ -12,6 +12,7 @@ use App\Services\MarketplaceEconomicRules;
 use App\Services\MarketplaceLedger;
 use App\Services\MarketplaceNotices;
 use App\Services\MarketplaceReturns;
+use App\Services\RetailerCredit;
 use App\Services\StockReservations;
 use App\Services\VendorOrderWorkflow;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,7 @@ class RefundMarketplaceVendor
             if ($existing) {
                 return $existing->id;
             }
-            if ($payment->provider !== 'stripe_connect' || $payment->simulated || $payment->status !== 'paid' || ! $payment->stripe_payment_intent_id) {
+            if ($payment->provider !== 'stripe_connect' || $payment->simulated || $payment->status !== 'paid' || (! $payment->stripe_payment_intent_id && $payment->card_cents !== 0)) {
                 throw ValidationException::withMessages(['refund' => 'Pagamento marketplace non rimborsabile.']);
             }
             $case = app(MarketplaceReturns::class)->request($admin, $v, $reason);
@@ -40,7 +41,7 @@ class RefundMarketplaceVendor
             }
             $bonus = $payment->funding_snapshot['bonus_by_vendor'][$v->id] ?? 0;
 
-            return DB::table('marketplace_provider_refunds')->insertGetId(['vendor_order_id' => $v->id, 'marketplace_return_case_id' => $case->id, 'requested_by' => $admin->id, 'idempotency_key' => 'vendor-refund:'.$v->id, 'payment_intent_id' => $payment->stripe_payment_intent_id, 'card_cents' => $v->total_cents - $bonus, 'bonus_cents' => $bonus, 'currency' => $v->currency, 'status' => 'requested', 'created_at' => now(), 'updated_at' => now()]);
+            return DB::table('marketplace_provider_refunds')->insertGetId(['vendor_order_id' => $v->id, 'marketplace_return_case_id' => $case->id, 'requested_by' => $admin->id, 'idempotency_key' => 'vendor-refund:'.$v->id, 'payment_intent_id' => $payment->stripe_payment_intent_id ?? $payment->reference, 'card_cents' => $v->total_cents - $bonus - ($payment->funding_snapshot['credit_by_vendor'][$v->id] ?? 0), 'bonus_cents' => $bonus, 'currency' => $v->currency, 'status' => 'requested', 'created_at' => now(), 'updated_at' => now()]);
         });
         if ($id < 0) {
             return MarketplaceReturnCase::findOrFail(-$id);
@@ -57,7 +58,7 @@ class RefundMarketplaceVendor
             return;
         }
         $gateway = app(StripeConnectMarketplaceGateway::class);
-        $result = $request->stripe_refund_id ? $gateway->retrieveRefund($request->stripe_refund_id) : $gateway->refund($request->payment_intent_id, (int) $request->card_cents, $request->idempotency_key);
+        $result = (int) $request->card_cents === 0 ? ['id' => 'credit-refund:'.$id, 'amount' => 0, 'currency' => strtolower($request->currency), 'payment_intent' => $request->payment_intent_id, 'status' => 'succeeded'] : ($request->stripe_refund_id ? $gateway->retrieveRefund($request->stripe_refund_id) : $gateway->refund($request->payment_intent_id, (int) $request->card_cents, $request->idempotency_key));
         if (($result['amount'] ?? null) !== (int) $request->card_cents || ($result['currency'] ?? null) !== strtolower($request->currency) || ($result['payment_intent'] ?? null) !== $request->payment_intent_id || ! is_string($result['id'] ?? null)) {
             throw new \LogicException('Provider refund mismatch.');
         }
@@ -84,6 +85,7 @@ class RefundMarketplaceVendor
             $returns = app(MarketplaceReturns::class);
             $returns->restoreBeforeDispatch($case, $v);
             app(MarketplaceLedger::class)->reverseVendor($v, $case->id);
+            app(RetailerCredit::class)->refundVendor($order, $v->id);
             if ($request->bonus_cents > 0) {
                 app(CustomerPromotionalBonus::class)->refund($order, (int) $request->bonus_cents, 'provider-refund:'.$id);
             }

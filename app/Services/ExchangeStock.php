@@ -61,6 +61,7 @@ class ExchangeStock
                 $r->update(['status' => $r->expires_at <= now() ? 'expired' : 'released', 'released_at' => now()]);
             }
         }
+        app(RetailerCredit::class)->finish($version, false);
         $payment = $version->payment()->lockForUpdate()->first();
         if ($payment && $payment->status === 'payment_pending') {
             $payment->update(['status' => 'cancelled']);

@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\Retailer;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Models\WalletTransaction;
 use App\Services\CustomerPromotionalBonus;
 use App\Services\ExchangeWorkflow;
 use App\Services\MarketplaceCart;
@@ -20,12 +21,14 @@ use App\Services\Payments\RefundMarketplaceVendor;
 use App\Services\Payments\StartExchangeDifferencePayment;
 use App\Services\Payments\StartMarketplacePayment;
 use App\Services\VendorOrderWorkflow;
+use App\Services\WalletBalance;
 use App\Support\ProportionalAllocation;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\ClientInterface;
 use Stripe\HttpClient\CurlClient;
@@ -46,6 +49,8 @@ class MarketplaceStripeConnectTest extends TestCase
         {
             public array $requests = [];
 
+            public array $refunds = [];
+
             public bool $fail = false;
 
             public string $refundStatus = 'succeeded';
@@ -57,7 +62,10 @@ class MarketplaceStripeConnectTest extends TestCase
                     throw new \RuntimeException('Ambiguous network timeout');
                 }
                 if (str_contains($absUrl, '/refunds')) {
-                    $body = ['id' => 're_test_1', 'object' => 'refund', 'status' => $this->refundStatus, 'amount' => $params['amount'] ?? 9000, 'payment_intent' => $params['payment_intent'] ?? 'pi_test_1', 'currency' => 'eur'];
+                    $id = $method === 'get' ? basename($absUrl) : 're_test_'.substr(hash('sha256', json_encode($headers)), 0, 16);
+                    $body = $this->refunds[$id] ?? ['id' => $id, 'object' => 'refund', 'amount' => $params['amount'], 'payment_intent' => $params['payment_intent'], 'currency' => 'eur'];
+                    $body['status'] = $this->refundStatus;
+                    $this->refunds[$id] = $body;
                 } else {
                     $body = ['id' => 'cs_test_'.$params['client_reference_id'], 'object' => 'checkout.session', 'livemode' => false, 'url' => 'https://checkout.stripe.com/c/pay/test_session'];
                 }
@@ -79,10 +87,15 @@ class MarketplaceStripeConnectTest extends TestCase
         config(['marketplace.economic_rules.execution_mode' => 'stripe_connect', 'marketplace.economic_rules.funds_flow' => 'stripe_connect_separate_charges_transfers', 'marketplace.stripe.secret' => 'sk_test_marketplace_fixture_only', 'marketplace.stripe.webhook_secret' => 'whsec_marketplace_fixture_only', 'marketplace.stripe.activation_verified' => true, 'marketplace.stripe.tax_verified' => true, 'marketplace.stripe.live_enabled' => false]);
     }
 
-    private function order(bool $bonus = false, string $plan = 'free', int $vendors = 1, bool $shortBonus = false): Order
+    private function order(bool $bonus = false, string $plan = 'free', int $vendors = 1, bool $shortBonus = false, ?int $retailerCredit = null): Order
     {
         $this->seed(PlanSeeder::class);
-        $u = User::factory()->create(['role' => 'customer']);
+        $u = User::factory()->create(['role' => $retailerCredit === null ? 'customer' : 'retailer']);
+        if ($retailerCredit !== null) {
+            $buyer = Retailer::factory()->approved()->create(['user_id' => $u->id]);
+            Subscription::factory()->active()->create(['retailer_id' => $buyer->id, 'plan_id' => Plan::where('code', 'pro')->sole()->id, 'starts_at' => now()->subDay()]);
+            WalletTransaction::create(['retailer_id' => $buyer->id, 'idempotency_key' => 'test-opening:'.$buyer->id, 'type' => 'adjustment', 'amount_cents' => $retailerCredit, 'currency' => 'EUR', 'entry_bucket' => 'available', 'simulated' => false, 'available_at' => now()->subMinute()]);
+        }
         if ($bonus) {
             $present = now();
             if ($shortBonus) {
@@ -122,6 +135,56 @@ class MarketplaceStripeConnectTest extends TestCase
     private function receive(string $body): string
     {
         return app(ReceiveMarketplaceStripeEvent::class)->handle($body, $this->signature($body));
+    }
+
+    public function test_real_ledger_credit_plus_card_only_charges_residual_and_refunds_original_sources(): void
+    {
+        $this->activate();
+        $o = $this->order(false, 'free', 2, false, 5000);
+        $buyer = User::findOrFail($o->user_id)->retailer;
+        $this->assertSame(5000, $o->payment->retailer_credit_cents);
+        $this->assertSame(15000, $o->payment->card_cents);
+        app(StartMarketplacePayment::class)->handle($o);
+        $this->assertSame(15000, $this->http->requests[0]['params']['line_items'][0]['price_data']['unit_amount']);
+        $this->assertSame('consumed', $this->receive($this->body($o)));
+        $this->assertSame(0, app(WalletBalance::class)->availableCents($buyer));
+        $admin = User::factory()->create(['role' => 'admin']);
+        foreach ($o->vendorOrders as $v) {
+            app(VendorOrderWorkflow::class)->refund($admin, $v, 'Full refund');
+            app(VendorOrderWorkflow::class)->refund($admin, $v, 'Retry');
+        }
+        $this->assertSame(5000, app(WalletBalance::class)->availableCents($buyer));
+        $this->assertSame(7500, $this->http->requests[1]['params']['amount']);
+        $this->assertSame(7500, $this->http->requests[2]['params']['amount']);
+        $this->assertSame('refunded', $o->fresh()->status->value);
+    }
+
+    public function test_real_credit_only_never_calls_psp_and_refund_restores_credit_once(): void
+    {
+        $this->activate();
+        $o = $this->order(false, 'pro', 1, false, 10000);
+        $buyer = User::findOrFail($o->user_id)->retailer;
+        app(StartMarketplacePayment::class)->handle($o);
+        app(StartMarketplacePayment::class)->handle($o);
+        $this->assertSame('paid', $o->fresh()->status->value);
+        $this->assertCount(0, $this->http->requests);
+        $admin = User::factory()->create(['role' => 'admin']);
+        app(VendorOrderWorkflow::class)->refund($admin, $o->vendorOrders->first(), 'Credit refund');
+        app(VendorOrderWorkflow::class)->refund($admin, $o->vendorOrders->first(), 'Retry');
+        $this->assertCount(0, $this->http->requests);
+        $this->assertSame(10000, app(WalletBalance::class)->availableCents($buyer));
+    }
+
+    public function test_expired_mixed_stripe_session_releases_real_credit_and_late_capture_refunds_only_card(): void
+    {
+        $this->activate();
+        $o = $this->order(false, 'free', 1, false, 4000);
+        app(StartMarketplacePayment::class)->handle($o);
+        $this->assertSame('released', $this->receive($this->body($o, 'expired-credit', 'checkout.session.expired')));
+        $this->assertSame('reconciliation_required', $this->receive($this->body($o, 'late-credit')));
+        $this->artisan('marketplace:reconcile-payments')->assertSuccessful();
+        $this->assertSame(6000, $this->http->requests[1]['params']['amount']);
+        $this->assertSame(4000, app(WalletBalance::class)->availableCents(User::find($o->user_id)->retailer));
     }
 
     public function test_card_payment_is_one_platform_charge_for_multiple_vendors_and_snapshot_free_fees(): void
@@ -190,12 +253,12 @@ class MarketplaceStripeConnectTest extends TestCase
         $this->assertDatabaseCount('wallet_transactions', 0);
     }
 
-    public function test_no_bonus_available_still_charges_card_and_retailer_cannot_spend_wallet(): void
+    public function test_no_bonus_available_still_charges_card_and_bonus_is_separate_from_retailer_credit(): void
     {
         $o = $this->order();
         $this->assertSame(0, $o->payment->bonus_cents);
         $this->assertSame(10000, $o->payment->card_cents);
-        $this->assertFalse(config('marketplace.credit.retailer_spending_enabled'));
+        $this->assertTrue(config('marketplace.credit.retailer_spending_enabled'));
         $this->assertSame(0, app(CustomerPromotionalBonus::class)->available(User::factory()->create(['role' => 'retailer'])));
     }
 
@@ -319,7 +382,13 @@ class MarketplaceStripeConnectTest extends TestCase
         DB::table('customer_bonus_entries')->update(['amount_cents' => 999]);
     }
 
-    public function test_exchange_difference_uses_card_and_a_separate_payee_ledger_credit(): void
+    public static function differenceFunding(): array
+    {
+        return ['card' => [0], 'mixed' => [10000], 'credit' => [30000]];
+    }
+
+    #[DataProvider('differenceFunding')]
+    public function test_exchange_difference_uses_card_and_a_separate_payee_ledger_credit(int $credit): void
     {
         $this->seed(PlanSeeder::class);
         $parties = [];
@@ -335,13 +404,26 @@ class MarketplaceStripeConnectTest extends TestCase
         $flow = app(ExchangeWorkflow::class);
         $e = $flow->create($a->user, $pb, ['key' => (string) Str::uuid(), 'lines' => ['a' => [['inventory_item_id' => $pa->id, 'quantity' => '1', 'value' => '1000']], 'b' => [['inventory_item_id' => $pb->id, 'quantity' => '1', 'value' => '1300']]], 'delivery' => ['a' => ['mode' => 'pickup', 'cost' => '0'], 'b' => ['mode' => 'pickup', 'cost' => '0']]]);
         $v = $e->currentVersion;
+        $this->activate();
+        if ($credit) {
+            WalletTransaction::create(['retailer_id' => $a->id, 'idempotency_key' => 'difference-opening', 'type' => 'adjustment', 'amount_cents' => $credit, 'currency' => 'EUR', 'entry_bucket' => 'available', 'simulated' => false, 'available_at' => now()->subMinute()]);
+        }
         $flow->accept($a->user, $e, $v->id, $v->summary_hash);
         $flow->accept($b->user, $e, $v->id, $v->summary_hash);
-        $this->activate();
         app(StartExchangeDifferencePayment::class)->handle($v);
         $p = $v->payment()->first();
+        $this->assertSame($credit, $p->retailer_credit_cents);
+        $this->assertSame(30000 - $credit, $p->card_cents);
+        if ($credit === 30000) {
+            $this->assertCount(0, $this->http->requests);
+            $this->assertSame('paid', $p->status);
+            $this->assertSame(29850, app(MarketplaceLedger::class)->balances($b, false)['pending']);
+
+            return;
+        }
+        $this->assertSame(30000 - $credit, $this->http->requests[0]['params']['line_items'][0]['price_data']['unit_amount']);
         $key = 'exchange:'.$e->uuid.':version:'.$v->id;
-        $body = json_encode(['id' => 'evt_exchange_paid', 'object' => 'event', 'livemode' => false, 'type' => 'checkout.session.completed', 'data' => ['object' => ['id' => $p->reference, 'mode' => 'payment', 'payment_status' => 'paid', 'payment_intent' => 'pi_exchange_test', 'amount_total' => 30000, 'currency' => 'eur', 'metadata' => ['marketplace_kind' => 'exchange', 'marketplace_id' => (string) $v->id, 'marketplace_key' => hash('sha256', $key)]]]]);
+        $body = json_encode(['id' => 'evt_exchange_paid', 'object' => 'event', 'livemode' => false, 'type' => 'checkout.session.completed', 'data' => ['object' => ['id' => $p->reference, 'mode' => 'payment', 'payment_status' => 'paid', 'payment_intent' => 'pi_exchange_test', 'amount_total' => 30000 - $credit, 'currency' => 'eur', 'metadata' => ['marketplace_kind' => 'exchange', 'marketplace_id' => (string) $v->id, 'marketplace_key' => hash('sha256', $key)]]]]);
         $this->assertSame('confirmed', $this->receive($body));
         $this->assertSame('confirmed', $this->receive($body));
         $this->assertSame(29850, app(MarketplaceLedger::class)->balances($b, false)['pending']);

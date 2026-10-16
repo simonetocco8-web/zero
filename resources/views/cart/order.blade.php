@@ -27,7 +27,10 @@
         @endforeach
     </div>
     <x-card class="mt-5"><x-order-totals :data="$order" />
-        @if($order->payment?->bonus_cents)
+        @if($order->payment?->retailer_credit_cents)
+<p>Credito retailer: {{ \App\Support\DisplayMoney::euros($order->payment->retailer_credit_cents) }} · Carta: {{ \App\Support\DisplayMoney::euros($order->payment->card_cents) }}.</p>
+@endif
+@if($order->payment?->bonus_cents)
             <p>Bonus promozionale: {{ \App\Support\DisplayMoney::euros($order->payment->bonus_cents) }} · Carta: {{ \App\Support\DisplayMoney::euros($order->payment->card_cents) }}.</p>
         @endif
     </x-card>

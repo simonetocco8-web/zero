@@ -8,6 +8,7 @@ use App\Services\ExchangeStock;
 use App\Services\ExchangeWorkflow;
 use App\Services\MarketplaceEconomicRules;
 use App\Services\MarketplaceLedger;
+use App\Services\RetailerCredit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -48,7 +49,7 @@ class ApplyExchangePaymentResult
                     $flow->event($e, 'difference_'.$state);
                 }
                 $outcome = 'released';
-            } elseif ($e->status->value !== 'awaiting_difference_payment' || ! $stock->active($e, $current, $lines)) {
+            } elseif ($e->status->value !== 'awaiting_difference_payment' || ! $stock->active($e, $current, $lines) || ! app(RetailerCredit::class)->active($current)) {
                 if ($e->status->open()) {
                     $stock->release($current);
                     $e->update(['status' => 'expired']);
@@ -75,6 +76,7 @@ class ApplyExchangePaymentResult
                     $outcome = 'reconciliation_required';
                 } else {
                     $stock->consume($e, $current, $lines, $products);
+                    app(RetailerCredit::class)->finish($current, true);
                     $payment->update(['status' => 'paid']);
                     if (($current->commission_snapshot['policy'] ?? null) === 'approved_difference_v1') {
                         app(MarketplaceLedger::class)->creditExchange($current);

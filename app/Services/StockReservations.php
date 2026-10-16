@@ -72,7 +72,7 @@ class StockReservations
     {
         return DB::transaction(function () use ($order, $callback) {
             $lines = $this->lines($order);
-            $retailers = InventoryItem::whereIn('id', $lines->pluck('inventory_item_id'))->orderBy('retailer_id')->pluck('retailer_id')->unique();
+            $retailers = InventoryItem::whereIn('id', $lines->pluck('inventory_item_id'))->orderBy('retailer_id')->pluck('retailer_id')->push($order->user->retailer?->id)->filter()->unique()->sort();
             foreach ($retailers as $id) {
                 Retailer::lockForUpdate()->findOrFail($id);
             }
@@ -124,6 +124,7 @@ class StockReservations
         $order->update(['status' => 'cancelled']);
         $order->vendorOrders()->update(['status' => 'cancelled']);
         app(CustomerPromotionalBonus::class)->finish($order, false);
+        app(RetailerCredit::class)->finish($order, false);
         $payment->update(['status' => $reason]);
         app(MarketplaceNotices::class)->orderEvent($order, MarketplaceNoticeKind::Cancelled);
     }

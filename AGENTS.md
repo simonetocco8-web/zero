@@ -1,6 +1,6 @@
 # Regole permanenti — ZeroMagazzino
 
-- DECISIONE CORRENTE: PDF pagamenti v1.0 del 14/10/2026 ricevuto il 16/10. Stripe Connect separate charges and transfers, vendite FREE/PRO 200/50 bp, conguaglio 50 bp al ricevente. Checkout 15m, conguaglio 1440m, proposta 48h. Saldo retailer NON spendibile al lancio; bonus customer separato 12 mesi/max10% merce. Questa decisione e docs/marketplace-payments.md prevalgono sui riferimenti storici sotto. Implementazione provider autorizzata dalla richiesta utente, attivazione live subordinata a verifica Stripe/fiscale. Nessun incasso reale durante sviluppo; fixture fake solo nei test.
+- DECISIONE CORRENTE: correzione vincolante utente 16/10/2026 (credito retailer spendibile e checkout 30m), poi PDF pagamenti v1.0 del 14/10/2026 ricevuto il 16/10. Stripe Connect separate charges and transfers, vendite FREE/PRO 200/50 bp, conguaglio 50 bp al ricevente. Checkout 30m, conguaglio 1440m, proposta 48h. Credito retailer maturato spendibile su acquisti e conguagli, anche insieme alla carta (correzione vincolante del committente del 16/10, prevale sul PDF per questi punti); bonus customer separato 12 mesi/max10% merce. Questa decisione e docs/marketplace-payments.md prevalgono sui riferimenti storici sotto. Implementazione provider autorizzata dalla richiesta utente, attivazione live subordinata a verifica Stripe/fiscale. Nessun incasso reale durante sviluppo; fixture fake solo nei test.
 
 ## Perimetro e stack
 

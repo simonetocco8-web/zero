@@ -31,7 +31,10 @@ class ReconcileMarketplacePayments
                             return;
                         }
                         $order = $p instanceof MarketplacePayment;
-                        $amount = $order ? ($p->card_cents ?? $p->amount_cents) : $p->amount_cents;
+                        $amount = $p->card_cents ?? $p->amount_cents;
+                        if ($amount === 0) {
+                            return;
+                        }
                         DB::table('marketplace_late_capture_refunds')->insertOrIgnore(['order_id' => $order ? $p->order_id : null, 'exchange_version_id' => $order ? null : $p->exchange_version_id, 'payment_intent_id' => $p->stripe_payment_intent_id, 'idempotency_key' => 'late-capture:'.$p->stripe_payment_intent_id, 'amount_cents' => $amount, 'currency' => $p->currency, 'created_at' => now(), 'updated_at' => now()]);
                     };
                     if ($p instanceof MarketplacePayment) {

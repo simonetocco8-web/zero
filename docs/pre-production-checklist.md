@@ -57,7 +57,7 @@ Da completare dal responsabile del rilascio su staging e sul server destinazione
 ## Audit finale su main consolidato e update senza SSH
 
 - [ ] Branch main basato almeno su 5fd789a; diff revisionato, CI e artifact sullo stesso commit.
-- [ ] I 24 scenari confrontati con final-marketplace-audit.md; saldo retailer non spendibile testato come rifiuto, bonus customer+carta distinto.
+- [ ] I 24 scenari confrontati con final-marketplace-audit.md; credito retailer maturato spendibile anche con carta testato come rifiuto, bonus customer+carta distinto.
 - [ ] Backup DB+trigger+storage+APP_KEY ripristinato su copia; pending reali e file storici confrontati.
 - [ ] Build deploy package in modalità update, checksum/manifest verificati; nessun install-zero.php residuo sul server.
 - [ ] PHP CLI via Cron Jobs verificato; maintenance, sospensione worker/scheduler e preservazione .env/storage/journal.
@@ -66,3 +66,6 @@ Da completare dal responsabile del rilascio su staging e sul server destinazione
 - [ ] Queue marketplace-notifications e integrations/default, scadenze e riconciliazioni funzionanti sul cPanel.
 - [ ] Sandbox Stripe Connect, fiscalità, trasferimenti/reversals, payout, prova consegna/OTP e contestazioni verificati prima del live.
 - [ ] Advisory Composer ripetuto con feed raggiungibile; controlli browser cloud distinti da dispositivi fisici e carico di produzione.
+
+- [ ] Release credito: `.env` esistente aggiornato a `MARKETPLACE_RESERVATION_MINUTES=30`, `MARKETPLACE_RETAILER_CREDIT_ENABLED=true`; cache config ricostruita, execution mode disabled fino al collaudo autorizzato. Migration000005 pending applicata solo con backup/manutenzione e runner additivo.
+- [ ] Credito maturato reale/simulato separato, saldo da ledger; acquisto e conguaglio solo credito/misti, quote vendor immutabili, release/refund e concorrenza con payout verificati. Il bonus customer non sostituisce il credito retailer.

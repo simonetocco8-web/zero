@@ -8,15 +8,15 @@ Il lavoro interrotto su `4d9fa52` è preservato nello stash `audit-on-obsolete-4
 
 **Esito: staging tecnico verificato; lancio commerciale live ancora subordinato ai blocchi operativi sotto.** Il marketplace esiste ed è coperto dai test. Rimangono da completare/validare settlement reale, trasferimenti/reversals, payout, consegna documentata/OTP, contestazioni e fiscalità. Non sono semplici valori .env mancanti.
 
-Source of truth economica: `marketplace-payments.md` e `adr/marketplace-funds-flow.md`, PDF v1.0. Connect separate charges and transfers; vendite FREE/PRO 200/50 bp, conguaglio 50 bp al ricevente; checkout 15m, conguaglio 1440m, proposta 48h. **Saldo retailer non spendibile**; bonus customer personale separato, 12 mesi, massimo 10% della merce e mai sui conguagli.
+Source of truth economica: istruzione vincolante successiva del committente sul credito retailer e checkout 30m, poi `marketplace-payments.md` e `adr/marketplace-funds-flow.md`, PDF v1.0 per i punti confermati. Connect separate charges and transfers; vendite FREE/PRO 200/50 bp, conguaglio 50 bp al ricevente; checkout 30m, conguaglio 1440m, proposta 48h. **Credito retailer maturato spendibile per acquisti e conguagli, anche con carta**; bonus customer personale separato, 12 mesi, massimo 10% della merce e mai sui conguagli.
 
 ## Verifiche eseguite
 
 | Verifica | Esito |
 | --- | --- |
-| Suite completa MySQL 8.4, processi concorrenti e DB nuovi | 380 passati, nessuno skip; 2327 asserzioni |
-| Suite completa SQLite | 358 passati, 22 esclusi perché richiedono MySQL; 2086 asserzioni |
-| Browser Chromium / axe / focus | 190 controlli su 38 pagine × 360/390/430/768/1366 px; nessun overflow o violazione axe rilevata, risposte 200 e focus da tastiera verificati |
+| Suite completa MySQL 8.4, processi concorrenti e DB nuovi | 407 passati, nessuno skip; 2459 asserzioni |
+| Suite completa SQLite | 380 passati, 27 esclusi perché richiedono MySQL; 2192 asserzioni |
+| Browser Chromium / axe / focus | 190 controlli della base su38 pagine +20 nuovi controlli sulle schermate credito, a360/390/430/768/1366px; nessun overflow o violazione axe rilevata |
 | Build frontend | Vite riuscito |
 | Composer | validate --strict e requisiti piattaforma riusciti; vendor produzione no-dev verificato separatamente |
 | Controlli statici | Pint completo, lint PHP, sintassi Bash e parsing YAML riusciti. PHPStan/Larastan non configurati |
@@ -47,8 +47,8 @@ Le prove usano dati sintetici e trasporto PSP fake/mocked. Non costituiscono un 
 | 14 | Conguaglio riuscito | PASS fake e SDK mock: conferma una volta, ledger distinto dalle vendite, consegna ancora da completare |
 | 15 | Annullamento | PASS: ownership customer, rilascio riserve, cancel scambio e isolamento sibling/notifiche |
 | 16 | Rimborso | PASS: integrale pre-consegna e late capture con intent PSP idempotente, pending/success distinti; partial PSP e post-spedizione restano workflow assistiti da completare |
-| 17 | Pagamento con credito | PASS del **rifiuto previsto**: il saldo retailer non è spendibile al lancio. Non si implementa il requisito storico superato |
-| 18 | Credito + carta | PASS per **bonus customer + carta**, max10% merce e seller a prezzo pieno; saldo retailer+carta rifiutato. CustomerBonusConcurrencyTest impedisce doppia spesa del bonus |
+| 17 | Pagamento con credito | PASS: acquisto e conguaglio solo credito retailer maturato, senza chiamata PSP, consumo una sola volta e refund/reversal append-only |
+| 18 | Credito + carta | PASS: credito retailer + carta su acquisti e conguagli; allocazione multi-vendor deterministica, failure/expiry/retry e race MySQL. Bonus customer + carta separato, max10% merce |
 | 19 | Commissione FREE | PASS: 200 bp snapshot e rimborsi senza repricing storico |
 | 20 | Commissione PRO | PASS: 50 bp snapshot, indipendente da successive modifiche piano |
 | 21 | Ownership customer | PASS: carrello/ordini/pagamenti/consegne/indirizzi/profilo/notifiche e accesso incrociato negato |
@@ -71,7 +71,7 @@ Le suite ExchangeDomainTest, ExchangeConcurrencyTest, MarketplaceFundsFlowAuditT
 | Money / quantity manipulation | Centesimi/millesimi esatti e Brick Math, arrotondamenti/snapshot e riallocazione senza perdita centesimi; float/negativi/precisione invalida rifiutati |
 | Webhook spoofing / replay | Corpo originale, tolleranza, ambiente test/live, identità piattaforma/sessione/importo/valuta e chiave richiesta; receipt/hash e idempotenza. Firma scaduta/alterata e fake su pagamento Connect respinti |
 | Duplicate charge | Marketplace usa chiave stabile e riconciliazione late capture. **Corretto anche un rischio nel billing PRO separato:** TTL locale non libera più automaticamente un nuovo intento; open/creating scaduti richiedono verifica provider |
-| Wallet double spending | Saldo retailer non spendibile; payout legacy con lock e riserva unica; bonus customer separato con test di due checkout concorrenti |
+| Wallet double spending | Credito retailer riservato sotto lock ordinati condivisi col payout; test MySQL due acquisti, stesso retry e acquisto contro payout; bonus customer separato |
 | Image access | Foto approvate pubbliche e proposte private distinte, traversal/MIME/ricodifica, Policy e no-store verificati |
 | Customer data exposure | Dati customer/indirizzi e pagamenti limitati al proprietario; notifiche minimizzate e pagine private no-store |
 | IBAN exposure | Cifratura, hidden, mascheratura e assenza in flash/email; test ledger/contatti bancari passati |
@@ -110,7 +110,7 @@ Il pacchetto locale da staging fuori Git è solo prova tecnica (`source_dirty=tr
 
 | Stato | Area |
 | --- | --- |
-| Verificato localmente | Marketplace customer/retailer/admin, carrello e snapshot multi-vendor, scambi versionati, riserve, incasso/refund mock, bonus, ownership e notifiche |
+| Verificato localmente | Marketplace customer/retailer/admin, carrello e snapshot multi-vendor, scambi versionati, riserve, credito retailer solo/misto carta, incasso/refund mock, bonus separato, ownership e notifiche |
 | Implementato e testato | Runner additivo su schema legacy popolato, packaging update/initial-install, guardie replay/maintenance/manifest e cron procedure |
 | Configurazione/collaudo esterno | PHP CLI cPanel, permessi CREATE/ALTER/INDEX/TRIGGER, backup restore, APP_KEY/storage, HTTPS/proxy, SMTP, worker integrations/default/marketplace-notifications e scheduler |
 | Configurazione/collaudo esterno | Account Connect/capabilities, chiavi/webhook distinti, testmode ufficiale, fiscalità merci/servizio/bonus e riconciliazione esiti ambigui |
@@ -118,4 +118,79 @@ Il pacchetto locale da staging fuori Git è solo prova tecnica (`source_dirty=tr
 | Sviluppo/operatività assistita | Partial refund PSP, resi post-consegna B2B/B2C, recovery dopo trasferimenti reali e amministrazione campagne bonus |
 | Verifica incompleta | Feed Composer advisory bloccato; ripetere quando consentito, senza dichiarare assenza di vulnerabilità PHP |
 
-Go per staging controllato; **no-go per attivazione economica live completa** finché i limiti operativi sopra non sono chiusi. Nessun requisito superato di wallet retailer spendibile viene reintrodotto.
+Go per staging controllato; **no-go per attivazione economica live completa** finché i limiti operativi sopra non sono chiusi. Il requisito vincolante successivo del committente sul credito retailer è implementato; il bonus customer non lo sostituisce.
+
+## Correzione prima della pubblicazione — credito retailer
+
+Base della correzione: commit locale `7664d2e444110c0e44c3bafee313118e57215845` su main. La nuova istruzione del committente prevale sul divieto di spesa inizialmente attribuito al PDF. Nessun push, deploy o incasso reale durante questa correzione.
+
+`RetailerCredit` usa esclusivamente disponibilità maturata dal ledger, con lock Retailer condivisi col payout, hold univoco per ordine/versione e movimenti append-only distinti reservation/release/purchase spend/difference spend/refund. Nessun balance aggiornato. Disponibilità e limiti rimborso vengono letti sulle righe correnti sotto lock, anche in REPEATABLE READ; fondi simulati isolati dai fondi reali.
+
+Acquisto 500€ con credito200€: riserva200€, carta300€, consumo al successo, release su fallimento/scadenza/cancel. Nel multi-vendor `credit_by_vendor` e `card_by_vendor` sono snapshot immutabili ripartiti con resti maggiori e spareggio ID. Refund per vendor restituisce soltanto la sua quota di credito e carta; nessun doppio rimborso. Conguaglio300€ con credito100€: carta200€, accredito economico300€ al ricevente, commissione150 centesimi sul totale differenza. Solo credito non invoca il gateway, usa receipt interna idempotente e conferma senza completare la consegna.
+
+CustomerPromotionalBonus resta separato, solo customer, max10% merce e mai conguagli. `MARKETPLACE_RETAILER_CREDIT_ENABLED=true`, `MARKETPLACE_EXECUTION_MODE=disabled` resta bloccante per nuove operazioni e addebiti. Reservation checkout30m da config/.env.example, senza costanti nella business logic o aggiornamenti delle scadenze storiche.
+
+Migration additiva 000005: hold/colonne/indici/ownership/immutabilità; CHECK MySQL esteso senza cambiare importi storici. ALTER nativo SQLite conserva i trigger wallet preesistenti. Inclusa nell'allowlist cPanel; packaging/workflow restano quelli già verificati.
+
+Test specifici: `RetailerCreditTest` (17 casi), `RetailerCreditConcurrencyTest` (5 gare MySQL: due ordini, stesso retry, payout concorrente, reversal concorrenti, retry reversal); `MarketplaceStripeConnectTest` ampliato per quota carta, rimborso fonti originali, solo credito senza SDK e late capture. Trasporto SDK soltanto mock, nessun PSP reale. Altri limiti live elencati sopra restano aperti; il credito spendibile non viene più elencato come requisito escluso.
+
+Browser aggiuntivo: **20 controlli** sulle quattro schermate modificate (checkout retailer, riepilogo200€+300€, ordine/snapshot, termini credito scambio) a360/390/430/768/1366px. Form reali di login/riepilogo/conferma, nessun overflow né violazione axe selezionata. I190 controlli del precedente audit restano evidenza della base, distinti da queste nuove prove.
+
+### Verifica definitiva della correzione
+
+- MySQL8.4: **407 passati**, zero esclusioni, **2459 assertions**, 401,92s; database nuovo isolato conservato.
+- SQLite: **380 passati**, **27 esclusi** perché richiedono MySQL, **2192 assertions**, 38,07s.
+- Frontend build, Pint completo, Composer validate --strict e platform requirements passati; lint31 file PHP,70 link documentali validi, git diff --check pulito.
+- Evidenze locali in `/workspace/work/retailer-credit/`: mysql-verified.log, sqlite-verified.log, build.log, pint-verified.log, composer-verified.log, platform-verified.log, php-lint.json, docs-links.json e browser.json. Nessun feed advisory PHP aggiuntivo consultato: blocco Composer già documentato sopra resta distinto dalla validazione.
+- Nessuna pubblicazione GitHub o esecuzione cPanel/produzione; il nuovo commit include la correzione sopra il precedente audit locale.
+
+### File della correzione
+
+```text
+.env.example
+AGENTS.md
+app/Actions/CreateMarketplaceOrder.php
+app/Http/Controllers/CheckoutController.php
+app/Http/Requests/CheckoutRequest.php
+app/Models/ExchangeDifferencePayment.php
+app/Models/MarketplacePayment.php
+app/Models/WalletTransaction.php
+app/Services/ExchangeStock.php
+app/Services/ExchangeWorkflow.php
+app/Services/Payments/ApplyExchangePaymentResult.php
+app/Services/Payments/ApplyMarketplacePaymentResult.php
+app/Services/Payments/FakeMarketplacePaymentGateway.php
+app/Services/Payments/ReceiveMarketplaceStripeEvent.php
+app/Services/Payments/ReconcileMarketplacePayments.php
+app/Services/Payments/RefundMarketplaceVendor.php
+app/Services/Payments/StartExchangeDifferencePayment.php
+app/Services/Payments/StartMarketplacePayment.php
+app/Services/Payments/StripeConnectMarketplaceGateway.php
+app/Services/RetailerCredit.php
+app/Services/StockReservations.php
+app/Services/VendorOrderWorkflow.php
+app/Services/WalletBalance.php
+config/marketplace.php
+database/migrations/2026_10_16_000005_add_retailer_credit_funding.php
+deployment/additive-migrations.json
+docs/adr/marketplace-funds-flow.md
+docs/architecture.md
+docs/cpanel-no-ssh-deployment.md
+docs/database.md
+docs/exchanges.md
+docs/final-marketplace-audit.md
+docs/marketplace-cart-orders.md
+docs/marketplace-payment-readiness.md
+docs/marketplace-payments.md
+docs/pre-production-checklist.md
+docs/requirements.md
+docs/stock-reservations.md
+resources/views/cart/checkout.blade.php
+resources/views/cart/order.blade.php
+resources/views/cart/review.blade.php
+resources/views/exchanges/show.blade.php
+tests/Feature/MarketplaceEconomicRulesTest.php
+tests/Feature/MarketplaceStripeConnectTest.php
+tests/Feature/RetailerCreditConcurrencyTest.php
+tests/Feature/RetailerCreditTest.php
+```

@@ -9,5 +9,6 @@
   "2026_10_16_000001_add_connect_payment_tracking",
   "2026_10_16_000002_add_customer_promotional_bonus",
   "2026_10_16_000003_add_provider_refund_requests",
-  "2026_10_16_000004_add_late_capture_reconciliation"
+  "2026_10_16_000004_add_late_capture_reconciliation",
+  "2026_10_16_000005_add_retailer_credit_funding"
 ]

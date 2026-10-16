@@ -237,5 +237,9 @@ Se fallisce prima delle migration (bootstrap/DB/lock), correggere configurazione
 
 Per il DB esistente seguire la procedura di aggiornamento sopra. Il vecchio installer
 non è un updater; non ricaricarlo e non rigenerare APP_KEY. Le regole economiche
-approvate restano in marketplace-payments.md: saldo retailer non spendibile, bonus
+approvate restano in marketplace-payments.md: credito retailer maturato spendibile anche con carta, bonus
 customer separato, Connect disabilitato finché i prerequisiti non sono verificati.
+
+### Release credito retailer e TTL checkout
+
+Su installazione esistente impostare esplicitamente `.env`: `MARKETPLACE_RESERVATION_MINUTES=30` e `MARKETPLACE_RETAILER_CREDIT_ENABLED=true`, rimuovendo eventuale override storico15. Ricostruire la cache configurazione con la procedura CLI sopra. `MARKETPLACE_EXECUTION_MODE=disabled` resta tale finché i prerequisiti di attivazione non sono verificati; il flag credito non abilita Stripe né chiamate live. Applicare la pending migration000005 inclusa nel manifest, verificare quantità/saldi e conservare journal; nessuna riserva storica viene estesa.
