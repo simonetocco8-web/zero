@@ -1,5 +1,9 @@
 # Pagamenti marketplace — decisioni correnti
 
+## Tipi della configurazione economica
+
+Le cinque variabili env numeriche (commissione conguaglio, TTL checkout/conguaglio, durata proposta e aliquota IVA servizio) vengono normalizzate a `int` prima di entrare nella config, anche tramite `.env` o variabili esportate dalla CI e dopo `config:cache`. IVA servizio assente/vuota resta `null`; zero esplicito resta `0`. Valori malformati, frazionari, scientifici o oltre il range degli interi PHP vengono rifiutati, senza convertirli silenziosamente a zero. I limiti commerciali restano validati dal dominio. Nessuna attivazione dei pagamenti deriva dalla normalizzazione.
+
 ## Correzione vincolante credito retailer — 16 ottobre 2026
 
 Questa decisione successiva prevale sul divieto di spesa del saldo riportato nella versione iniziale del PDF. `MARKETPLACE_RETAILER_CREDIT_ENABLED=true` per default abilita il dominio; `MARKETPLACE_EXECUTION_MODE=disabled` continua a impedire tutte le nuove operazioni economiche e qualsiasi incasso reale. `MARKETPLACE_RESERVATION_MINUTES=30`: il TTL proviene da configurazione, senza costanti nella business logic e senza estendere riserve storiche.
