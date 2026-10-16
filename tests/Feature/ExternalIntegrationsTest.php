@@ -8,10 +8,12 @@ use App\Data\StripeSubscriptionData;
 use App\Jobs\ProcessIntegrationEvent;
 use App\Models\BillingCheckout;
 use App\Models\BillingSubscription;
+use App\Models\Exchange;
 use App\Models\IntegrationEvent;
 use App\Models\InventoryItem;
 use App\Models\Plan;
 use App\Models\Retailer;
+use App\Models\Sale;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WalletTransaction;
@@ -312,6 +314,29 @@ class ExternalIntegrationsTest extends TestCase
         (new ProcessIntegrationEvent($event->id))->handle();
         $this->assertSame(0, app(WalletBalance::class)->availableCents($this->retailer));
         $this->assertSame(4, WalletTransaction::count());
+    }
+
+    public function test_signed_pending_then_paid_and_exchange_payment_have_distinct_fulfillment(): void
+    {
+        $pending = $this->storePayload('order.pending', 'pending-new');
+        $this->postStore($pending)->assertAccepted();
+        (new ProcessIntegrationEvent(IntegrationEvent::where('event_type', 'store.order.pending')->sole()->id))->handle();
+        $this->assertSame('payment_pending', Sale::sole()->status->value);
+        $this->assertSame(0, app(WalletBalance::class)->availableCents($this->retailer));
+        $pending['type'] = 'order.paid';
+        $pending['event_id'] = 'paid-new';
+        $this->postStore($pending)->assertAccepted();
+        (new ProcessIntegrationEvent(IntegrationEvent::where('event_type', 'store.order.paid')->sole()->id))->handle();
+        $this->assertSame('paid', Sale::sole()->status->value);
+        $exchange = Exchange::create(['provider' => 'fake', 'external_exchange_id' => 'x1', 'retailer_id' => $this->retailer->id, 'counterparty_retailer_id' => Retailer::factory()->approved()->create()->id]);
+        $payload = ['event_id' => 'exchange-paid', 'type' => 'exchange.payment_confirmed', 'data' => ['external_exchange_id' => 'x1', 'payment_reference' => 'pay-x1']];
+        $this->postStore($payload, 'wrong')->assertUnauthorized();
+        $this->postStore($payload)->assertAccepted();
+        $event = IntegrationEvent::where('event_type', 'store.exchange.payment_confirmed')->sole();
+        (new ProcessIntegrationEvent($event->id))->handle();
+        (new ProcessIntegrationEvent($event->id))->handle();
+        $this->assertSame('confirmed', $exchange->fresh()->status);
+        $this->assertNull($exchange->fresh()->completed_at);
     }
 
     public function test_store_cannot_spoof_billing_namespace_or_product_ownership(): void

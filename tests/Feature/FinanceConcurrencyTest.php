@@ -29,7 +29,7 @@ class FinanceConcurrencyTest extends TestCase
 
     public static function operations(): array
     {
-        return ['payout' => ['payout'], 'sale' => ['sale'], 'refund' => ['refund']];
+        return ['payout' => ['payout'], 'sale' => ['sale'], 'refund' => ['refund'], 'split_refund' => ['split_refund']];
     }
 
     #[DataProvider('operations')]
@@ -38,16 +38,17 @@ class FinanceConcurrencyTest extends TestCase
         if (DB::getDriverName() !== 'mysql') {
             $this->markTestSkipped('Real row-lock concurrency requires MySQL.');
         }
+        config(['orders.stock_rule' => 'restore_on_full_refund']);
         $this->seed(PlanSeeder::class);
         $retailer = Retailer::factory()->approved()->create(['iban' => 'IT60X0542811101000000123456']);
         Subscription::factory()->active()->create(['retailer_id' => $retailer->id, 'plan_id' => Plan::where('code', 'free')->sole()->id, 'starts_at' => now()->subDay()]);
-        $product = InventoryItem::factory()->create(['retailer_id' => $retailer->id]);
+        $product = InventoryItem::factory()->create(['retailer_id' => $retailer->id, 'quantity' => '10']);
         $payload = ['provider' => 'fake', 'external_order_id' => 'race-order', 'timestamp' => now()->toIso8601String(), 'items' => [['external_line_id' => '1', 'inventory_item_id' => $product->id, 'retailer_id' => $retailer->id, 'quantity' => '1', 'unit_price_cents' => 10000]]];
         if ($operation !== 'sale') {
             app(SaleAccounting::class)->recordSale($payload);
         }
-        if ($operation === 'refund') {
-            $payload = ['provider' => 'fake', 'external_order_id' => 'race-order', 'external_refund_id' => 'race-refund', 'timestamp' => now()->toIso8601String(), 'items' => [['external_line_id' => '1', 'amount_cents' => 10000]]];
+        if (in_array($operation, ['refund', 'split_refund'])) {
+            $payload = ['provider' => 'fake', 'external_order_id' => 'race-order', 'external_refund_id' => 'race-refund', 'timestamp' => now()->toIso8601String(), 'items' => [['external_line_id' => '1', 'amount_cents' => $operation === 'split_refund' ? 5000 : 10000]]];
         }
         $script = tempnam(sys_get_temp_dir(), 'zero-payout-race-');
         $gate = $script.'.go';
@@ -62,14 +63,14 @@ $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 $until=microtime(true)+10;while(!file_exists($argv[2])&&microtime(true)<$until)usleep(10000);
 try {
  if($argv[3]==='payout') app(App\Actions\RequestPayout::class)->handle(App\Models\User::findOrFail($argv[1]));
- else { $data=json_decode(file_get_contents($argv[4]),true,512,JSON_THROW_ON_ERROR); $service=app(App\Services\SaleAccounting::class); if($argv[3]==='sale') $service->recordSale($data); else $service->refund($data); }
+ else { $data=json_decode(file_get_contents($argv[4]),true,512,JSON_THROW_ON_ERROR); $service=app(App\Services\SaleAccounting::class); if ($argv[3] === 'split_refund') $data['external_refund_id'] .= '-'.$argv[5]; if($argv[3]==='sale') $service->recordSale($data); else $service->refund($data); }
  exit(0);
 }
 catch(Illuminate\Validation\ValidationException $e){exit(isset($e->errors()['payout'])?3:4);}
 CODE);
         try {
             for ($i = 0; $i < 2; $i++) {
-                $process = new Process([PHP_BINARY, $script, (string) $retailer->user_id, $gate, $operation, $input], base_path(), ['APP_ENV' => 'testing', 'DB_CONNECTION' => 'mysql', 'DB_DATABASE' => config('database.connections.mysql.database')]);
+                $process = new Process([PHP_BINARY, $script, (string) $retailer->user_id, $gate, $operation, $input, (string) $i], base_path(), ['ORDER_STOCK_RULE' => 'restore_on_full_refund', 'APP_ENV' => 'testing', 'DB_CONNECTION' => 'mysql', 'DB_DATABASE' => config('database.connections.mysql.database')]);
                 $process->setTimeout(20);
                 $process->start();
                 $processes[] = $process;
@@ -83,9 +84,10 @@ CODE);
             }
             sort($codes);
             $this->assertSame($operation === 'payout' ? [0, 3] : [0, 0], $codes);
+            $this->assertSame(in_array($operation, ['refund', 'split_refund']) ? 10000 : 9000, $product->fresh()->quantity_milliunits);
             $this->assertSame(1, Sale::count());
             $this->assertSame($operation === 'payout' ? 1 : 0, $retailer->payoutRequests()->count());
-            $this->assertSame($operation === 'refund' ? 4 : ($operation === 'payout' ? 3 : 2), $retailer->walletTransactions()->count());
+            $this->assertSame($operation === 'split_refund' ? 6 : ($operation === 'refund' ? 4 : ($operation === 'payout' ? 3 : 2)), $retailer->walletTransactions()->count());
             $this->assertSame($operation === 'sale' ? 9800 : 0, app(WalletBalance::class)->availableCents($retailer));
         } finally {
             foreach ($processes as $process) {

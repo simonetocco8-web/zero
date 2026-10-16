@@ -202,3 +202,22 @@ Per refund: data.external_refund_id stabile, external_order_id/timestamp e items
 5. Testare gateway con fake HTTP, signature valida/errata/scaduta, payload modificato, duplicati/concorrenza, evento fuori ordine, timeout e risposta persa; quindi fare contract test nella sandbox reale. Concordare stock, tasse, spedizione e rimborsi con il provider prima della produzione.
 
 I test attuali simulano trasporto HTTP dell’SDK Stripe, webhook firmati, queue e provider; non effettuano pagamenti reali o chiamate a negozi esterni.
+
+## Eventi lifecycle
+
+L'endpoint store firmato accetta anche `order.pending`, con gli stessi campi riga di
+order.paid: crea il padre e i sottoordini senza stock, credito o commissione. Il
+successivo order.paid deve riferirsi ai rivenditori non annullati, usa un event_id distinto
+e non può riaprire sottoordini annullati. L'evento paid può arrivare direttamente,
+come negli adapter precedenti. `items.*.delivery_method` opzionale vale shipping o
+pickup, coerente per tutte le righe di ciascun rivenditore.
+
+`exchange.payment_confirmed` usa data.external_exchange_id e data.payment_reference,
+entrambi stringhe stabili. Lo scambio deve esistere per quel provider; lo stesso
+pagamento è idempotente, un riferimento diverso dopo conferma viene rifiutato.
+Firma, inbox e retry sono gli stessi degli altri eventi store.
+
+Le PATCH autenticate `/retailer/orders/{vendorOrder}/fulfillment` e
+`/retailer/exchanges/{exchange}/fulfillment` accettano status, carrier e tracking_code.
+Sono protette da sessione, CSRF, rate limit, Form Request e Policy; non accettano
+proprietario, importi, pagamento o timestamp client come campi modificabili.

@@ -18,7 +18,7 @@ class CreditController extends Controller
         return response()->view('retailer.credit', [
             'retailer' => $retailer, 'available' => $wallet->availableCents($retailer), 'earned' => $wallet->netEarnedCents($retailer), 'reserved' => $wallet->reservedCents($retailer),
             'plan' => $retailer->activeSubscription?->plan,
-            'sales' => $retailer->saleItems()->with('sale')->where('currency', 'EUR')->latest('id')->paginate(10, ['*'], 'sales_page'),
+            'sales' => $retailer->saleItems()->with(['sale', 'vendorOrder'])->where('currency', 'EUR')->latest('id')->paginate(10, ['*'], 'sales_page'),
             'movements' => $retailer->walletTransactions()->where('currency', 'EUR')->latest('id')->paginate(15, ['*'], 'movements_page'),
             'payouts' => $retailer->payoutRequests()->where('currency', 'EUR')->latest('id')->paginate(10, ['*'], 'payouts_page'),
             'pending' => $retailer->payoutRequests()->where('status', 'pending')->exists(),

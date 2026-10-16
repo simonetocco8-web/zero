@@ -168,3 +168,47 @@ Receipt canoniche in integration_events per provider+ordine e provider+refund ID
 Migration 2026_10_07_000005: billing_checkouts (UUID intento, owner, prezzo/periodo snapshot, sessione univoca, URL cifrata e nascosta, stato/scadenza; colonna generata open_retailer_id univoca per creating/open); billing_subscriptions (provider/ID remoto univoci, owner, checkout FK, status, invoice_paid, importo/Price/periodo, fine periodo, cancellazione a scadenza, ultimo timestamp evento). ID remoti case-sensitive su MySQL.
 
 subscriptions.billing_subscription_id FK nullable collega ogni intervallo PRO a uno stato provider, mantenendo la cronologia esistente e il vincolo di un solo piano locale active. Downgrade chiude il vecchio intervallo e attiva FREE, non cambia le vendite. integration_events.processing_at e indice status/processing_at supportano lease/retry. Payload inbox cifrati, hash e provider/event ID univoci; nessun secret persistito. fake_store_products.archived protegge dai tentativi di ripubblicare revisioni archiviate.
+
+## Lifecycle operativo ordini e scambi
+
+`vendor_orders` separa un sottoordine per coppia vendita/rivenditore. Le righe economiche
+sono collegate con `vendor_order_id`; gli ordini storici sono migrati ricostruendo lo
+stato finanziario di ciascun rivenditore dal ledger, senza inventare spedizioni.
+`status` rappresenta anche annullamenti/rimborsi, mentre `fulfillment_status` conserva
+il progresso logistico dopo un rimborso parziale. Gli stati operativi sono
+`payment_pending → paid → preparing → shipped|ready_for_pickup → completed`.
+`pending` resta nell'enum PHP soltanto per compatibilità; i dati storici sono convertiti.
+
+`OperationalLifecycle` valida transizioni e modalità di consegna, applica Policy e
+lock; i retailer possono modificare soltanto sottoordini propri con azienda approvata.
+Pagamento e rimborso provengono dall'adapter autenticato. Annullamento consentito
+prima del pagamento o, per un sottoordine pagato, prima della spedizione/ritiro:
+lo storno del residuo economico usa lo stesso motore idempotente dei rimborsi.
+La conferma di un annullamento non esegue chiamate a un PSP: l'esecuzione monetaria
+esterna rimane responsabilità dell'adapter ecommerce, come nel dominio economico.
+
+Il padre deriva dai sottoordini sotto lock: tutti annullati → cancelled; altrimenti
+esclude gli annullati, mantiene lo stato comune o il primo avanzamento ancora aperto.
+Rimborsi insieme a sottoordini attivi producono partially_refunded; tutti i sottoordini
+non annullati rimborsati producono refunded. Fra spedizione e ritiro ancora aperti,
+ready_for_pickup precede shipped. I dettagli dei sottoordini mantengono l'informazione
+che non può essere espressa da un singolo stato aggregato.
+
+`ORDER_STOCK_RULE` è salvata sul sottoordine alla creazione: external (default,
+nessuna modifica locale), deduct_only (scala al pagamento, nessun ripristino),
+restore_on_full_refund (scala al pagamento e ripristina la quantità di una riga solo
+quando interamente rimborsata). Rimborsi monetari parziali non implicano quantità
+restituite. Le righe storiche hanno quantità scalata zero: non generano nuovo stock.
+`ORDER_ALLOW_PARTIAL_REFUNDS=false` richiede il rimborso del residuo di tutte le righe
+del sottoordine interessato. Commissione restituita cumulativamente sulla snapshot
+originale; receipt e ledger prevengono doppie contabilizzazioni anche dopo completamento.
+
+`exchanges` conserva identificativo esterno, due rivenditori, modalità e fulfillment.
+Il pagamento autenticato porta a confirmed; poi preparing, shipped/ready_for_pickup,
+completed. Soltanto il rivenditore responsabile del fulfillment aggiorna lo scambio.
+La creazione/negoziazione dello scambio e gli eventuali conguagli restano al sistema
+esterno: non viene introdotto un nuovo checkout. `lifecycle_events` è audit append-only
+con attore per azioni browser e riferimento evento per rimborsi; notifiche database
+ai proprietari sono scritte nella stessa transazione. Replay non generano notifiche
+duplicate. Carrier/tracking sono facoltativi alla spedizione; le date operative sono
+impostate dal server. Nessuna nuova email viene inviata.

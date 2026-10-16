@@ -3,8 +3,10 @@
 namespace App\Jobs;
 
 use App\Data\StoreEventData;
+use App\Models\Exchange;
 use App\Models\IntegrationEvent;
 use App\Services\Billing\SyncStripeSubscription;
+use App\Services\OperationalLifecycle;
 use App\Services\SaleAccounting;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -47,7 +49,12 @@ class ProcessIntegrationEvent implements ShouldQueue
             } elseif (str_starts_with($event->event_type, 'store.')) {
                 $dto = StoreEventData::fromArray($event->provider, $event->payload);
                 $service = app(SaleAccounting::class);
-                if ($dto->type === 'order.paid') {
+                if ($dto->type === 'exchange.payment_confirmed') {
+                    $exchange = Exchange::where('provider', $dto->provider)->where('external_exchange_id', $dto->exchange['external_exchange_id'])->firstOrFail();
+                    app(OperationalLifecycle::class)->confirmExchangePayment($exchange, $dto->exchange['payment_reference']);
+                } elseif ($dto->type === 'order.pending') {
+                    $service->recordPending($dto->financial->toInput());
+                } elseif ($dto->type === 'order.paid') {
                     $service->recordSale($dto->financial);
                 } else {
                     $service->refund($dto->financial);

@@ -15,7 +15,7 @@ class Sale extends Model
     /** @use HasFactory<SaleFactory> */
     use HasFactory;
 
-    protected $attributes = ['status' => 'pending', 'currency' => 'EUR'];
+    protected $attributes = ['status' => 'payment_pending', 'currency' => 'EUR'];
 
     protected $fillable = ['provider', 'external_order_id', 'status', 'currency', 'total_cents', 'customer_email', 'ordered_at', 'paid_at'];
 
@@ -30,6 +30,11 @@ class Sale extends Model
             'ordered_at' => 'immutable_datetime',
             'paid_at' => 'immutable_datetime',
         ];
+    }
+
+    public function vendorOrders(): HasMany
+    {
+        return $this->hasMany(VendorOrder::class);
     }
 
     public function items(): HasMany

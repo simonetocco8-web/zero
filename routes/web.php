@@ -8,6 +8,7 @@ use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CreditController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FulfillmentController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\RetailerController;
 use App\Http\Middleware\EnsureApprovedRetailer;
@@ -23,6 +24,8 @@ Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('
 Route::middleware(['auth', 'can:accessRetailerArea,'.User::class])->prefix('retailer')->name('retailer.')->group(function (): void {
     Route::get('dashboard', [RetailerController::class, 'dashboard'])->name('dashboard');
     Route::middleware(EnsureApprovedRetailer::class)->group(function () {
+        Route::patch('orders/{vendorOrder}/fulfillment', [FulfillmentController::class, 'order'])->middleware('throttle:30,1')->name('orders.fulfillment');
+        Route::patch('exchanges/{exchange}/fulfillment', [FulfillmentController::class, 'exchange'])->middleware('throttle:30,1')->name('exchanges.fulfillment');
         Route::get('stock', [InventoryController::class, 'index'])->name('stock');
         Route::get('sell', [InventoryController::class, 'create'])->name('sell');
         Route::post('stock', [InventoryController::class, 'store'])->middleware('throttle:20,1')->name('stock.store');

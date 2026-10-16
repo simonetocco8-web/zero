@@ -20,12 +20,14 @@ class SaleItem extends Model
 
     protected $attributes = ['unit' => 'piece', 'currency' => 'EUR'];
 
-    protected $fillable = ['sale_id', 'inventory_item_id', 'retailer_id', 'external_line_id', 'name', 'sku', 'unit', 'quantity', 'quantity_milliunits', 'currency', 'unit_price_cents', 'line_total_cents', 'commission_basis_points', 'commission_cents', 'discount_cents', 'net_cents'];
+    protected $fillable = ['vendor_order_id', 'stock_deducted_milliunits', 'stock_restored_milliunits', 'sale_id', 'inventory_item_id', 'retailer_id', 'external_line_id', 'name', 'sku', 'unit', 'quantity', 'quantity_milliunits', 'currency', 'unit_price_cents', 'line_total_cents', 'commission_basis_points', 'commission_cents', 'discount_cents', 'net_cents'];
 
     protected function casts(): array
     {
         return [
             'quantity_milliunits' => ExactIntegerCast::class,
+            'stock_deducted_milliunits' => ExactIntegerCast::class,
+            'stock_restored_milliunits' => ExactIntegerCast::class,
             'currency' => CurrencyCode::class,
             'unit_price_cents' => ExactIntegerCast::class,
             'line_total_cents' => ExactIntegerCast::class,
@@ -34,6 +36,11 @@ class SaleItem extends Model
             'discount_cents' => ExactIntegerCast::class,
             'net_cents' => ExactIntegerCast::class,
         ];
+    }
+
+    public function vendorOrder(): BelongsTo
+    {
+        return $this->belongsTo(VendorOrder::class);
     }
 
     public function sale(): BelongsTo

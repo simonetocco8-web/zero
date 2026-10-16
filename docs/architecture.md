@@ -107,3 +107,12 @@ PrivatePageHeaders centralizza no-store per pagine autenticate e form auth, nosn
 ## Verifica e distribuzione (Prompt 10)
 
 GitHub Actions valida dipendenze/installazione congelata, piattaforma PHP 8.4, formatter completo, build Node 24, suite MySQL con concorrenza e SQLite, cache config/route/view e scheduler. Production document root sul solo public, storage privato persistente, queue durevole e cron ogni minuto. Nessun deployment automatico. Procedure, variabili, copertura e checklist in deployment.md, environment.md, testing.md e pre-production-checklist.md.
+
+## Lifecycle operativo
+
+`OperationalLifecycle` gestisce fulfillment, ownership e aggregazione; `SaleAccounting`
+conserva l'idempotenza economica e `OrderStock` applica il ripristino consentito
+dalla regola fotografata sul sottoordine. Lock e notifiche database sono transazionali.
+Audit operativo append-only separato dall'audit amministrativo, con attore nullable
+per gli eventi firmati del provider. Contratti e regole in [database.md](database.md)
+e [integrations.md](integrations.md).

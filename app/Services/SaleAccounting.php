@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\Retailer;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\VendorOrder;
 use App\Models\WalletTransaction;
 use App\Support\MoneyMath;
 use Brick\Math\BigDecimal;
@@ -34,18 +35,51 @@ class SaleAccounting
             $this->lockRetailers(array_column($data['items'], 'retailer_id'));
             $existing = Sale::where('provider', $data['provider'])->where('external_order_id', $data['external_order_id'])->lockForUpdate()->first();
             if ($existing) {
-                if ($event->status->value !== 'processed') {
+                if ($existing->status->value !== 'payment_pending' && $event->status->value !== 'processed') {
                     $this->invalid('external_order_id', 'Ordine già presente senza una ricevuta economica coerente.');
                 }
 
-                return $existing;
+                if ($existing->paid_at) {
+                    return $existing;
+                }
+                if ($existing->status->value !== 'payment_pending') {
+                    $this->invalid('status', 'Ordine chiuso.');
+                }
             }
-            $sale = Sale::create(['provider' => $data['provider'], 'external_order_id' => $data['external_order_id'], 'status' => 'paid', 'currency' => 'EUR', 'total_cents' => 0, 'ordered_at' => $data['timestamp'], 'paid_at' => $data['timestamp']]);
+            if ($existing) {
+                $expected = $existing->vendorOrders()->where('status', '!=', 'cancelled')->pluck('retailer_id')->sort()->values()->all();
+                $actual = array_values(array_unique(array_column($data['items'], 'retailer_id')));
+                sort($actual);
+                if ($expected !== $actual) {
+                    $this->invalid('items', 'I rivenditori non corrispondono all’ordine in attesa.');
+                }
+            }
+            $sale = $existing ?? Sale::create(['provider' => $data['provider'], 'external_order_id' => $data['external_order_id'], 'status' => 'paid', 'currency' => 'EUR', 'total_cents' => 0, 'ordered_at' => $data['timestamp'], 'paid_at' => $data['timestamp']]);
+            $sale->update(['status' => 'paid', 'paid_at' => $data['timestamp']]);
             $total = BigInteger::zero();
             foreach ($data['items'] as $line) {
                 $product = InventoryItem::whereKey($line['inventory_item_id'])->where('retailer_id', $line['retailer_id'])->lockForUpdate()->first();
                 if (! $product || $product->currency !== 'EUR') {
                     $this->invalid('items', 'Prodotto e rivenditore non corrispondono, oppure valuta non supportata.');
+                }
+                $order = $sale->vendorOrders()->firstOrCreate(['retailer_id' => $line['retailer_id']], ['status' => 'paid', 'fulfillment_status' => 'paid', 'stock_rule' => config('orders.stock_rule'), 'delivery_method' => $line['delivery_method'] ?? 'shipping']);
+                if ($order->status === 'cancelled') {
+                    $this->invalid('status', 'Sottoordine annullato.');
+                }
+                if ($order->delivery_method !== ($line['delivery_method'] ?? 'shipping')) {
+                    $this->invalid('delivery_method', 'Modalità incompatibili nello stesso sottoordine.');
+                }
+                $order->update(['status' => 'paid', 'fulfillment_status' => 'paid']);
+                if (! in_array($order->stock_rule, ['external', 'deduct_only', 'restore_on_full_refund'], true)) {
+                    $this->invalid('stock', 'Regola stock non valida.');
+                }
+                $deducted = 0;
+                if ($order->stock_rule !== 'external') {
+                    if ($product->quantity_milliunits < $line['quantity_milliunits']) {
+                        $this->invalid('stock', 'Stock insufficiente.');
+                    }
+                    $deducted = $line['quantity_milliunits'];
+                    $product->update(['quantity_milliunits' => $product->quantity_milliunits - $deducted]);
                 }
                 $retailer = Retailer::findOrFail($line['retailer_id']);
                 $subscription = $retailer->subscriptions()->whereIn('status', ['active', 'cancelled', 'expired'])->where('starts_at', '<=', $data['timestamp'])->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>', $data['timestamp']))->where(fn ($q) => $q->whereNull('cancelled_at')->orWhere('cancelled_at', '>', $data['timestamp']))->orderByDesc('starts_at')->orderByDesc('id')->lockForUpdate()->first();
@@ -58,16 +92,44 @@ class SaleAccounting
                     $this->invalid('discount_cents', 'Lo sconto supera il valore della riga.');
                 }
                 $commission = MoneyMath::commissionCents($gross, $plan->commission_basis_points);
-                $item = $sale->items()->create([...$line, 'name' => $product->name, 'sku' => $product->sku, 'unit' => $product->unit, 'currency' => 'EUR', 'line_total_cents' => $gross, 'commission_basis_points' => $plan->commission_basis_points, 'commission_cents' => $commission, 'net_cents' => $gross - $commission]);
+                $item = $sale->items()->create([...array_diff_key($line, ['delivery_method' => true]), 'vendor_order_id' => $order->id, 'stock_deducted_milliunits' => $deducted, 'name' => $product->name, 'sku' => $product->sku, 'unit' => $product->unit, 'currency' => 'EUR', 'line_total_cents' => $gross, 'commission_basis_points' => $plan->commission_basis_points, 'commission_cents' => $commission, 'net_cents' => $gross - $commission]);
                 $available = CarbonImmutable::parse($data['timestamp'])->addDays(config('finance.credit_maturation_days', 0));
                 $this->movement($item, $event, 'sale_credit', $gross, 'sale:'.$item->id.':credit', $available, 'Vendita');
                 $this->movement($item, $event, 'commission', -$commission, 'sale:'.$item->id.':commission', $available, 'Commissione vendita');
                 $total = $total->plus($gross);
             }
             $sale->update(['total_cents' => $total->toInt()]);
+            foreach ($sale->vendorOrders()->where('status', 'paid')->get() as $order) {
+                app(OperationalLifecycle::class)->record($order, 'payment_pending', 'paid');
+            }
             $this->processed($event);
 
             return $sale->load('items');
+        }, 5);
+    }
+
+    /** Trusted adapter entry point; pending orders never credit the wallet. */
+    public function recordPending(array $input): Sale
+    {
+        $data = FinancialEventData::fromArray('order.paid', $input)->toArray();
+
+        return DB::transaction(function () use ($data) {
+            $event = $this->receipt($data, 'pending', $data['external_order_id']);
+            $this->processed($event);
+            $this->lockRetailers(array_column($data['items'], 'retailer_id'));
+            $sale = Sale::where('provider', $data['provider'])->where('external_order_id', $data['external_order_id'])->lockForUpdate()->first();
+            if ($sale) {
+                return $sale;
+            }
+            $sale = Sale::create(['provider' => $data['provider'], 'external_order_id' => $data['external_order_id'], 'status' => 'payment_pending', 'total_cents' => 0, 'ordered_at' => $data['timestamp']]);
+            foreach ($data['items'] as $line) {
+                if (! InventoryItem::whereKey($line['inventory_item_id'])->where('retailer_id', $line['retailer_id'])->exists()) {
+                    $this->invalid('items', 'Prodotto e rivenditore non corrispondono.');
+                }
+                $sale->vendorOrders()->firstOrCreate(['retailer_id' => $line['retailer_id']], ['status' => 'payment_pending', 'fulfillment_status' => 'payment_pending', 'delivery_method' => $line['delivery_method'] ?? 'shipping', 'stock_rule' => config('orders.stock_rule')]);
+            }
+
+            return $sale;
         }, 5);
     }
 
@@ -91,13 +153,32 @@ class SaleAccounting
             if ($event->status->value === 'processed') {
                 return $sale;
             }
-            if (! in_array($sale->status->value, ['paid', 'partially_refunded', 'refunded'], true)) {
+            if (! $sale->paid_at) {
                 $this->invalid('external_order_id', 'La vendita non è stata confermata.');
+            }
+            if (! config('orders.allow_partial_refunds')) {
+                foreach ($sale->vendorOrders()->lockForUpdate()->get() as $order) {
+                    $requested = collect($data['items'])->keyBy('external_line_id');
+                    $items = $order->items()->lockForUpdate()->get();
+                    if (! $items->contains(fn ($item) => $requested->has($item->external_line_id))) {
+                        continue;
+                    }
+                    foreach ($items as $item) {
+                        $remaining = $item->line_total_cents + (int) $item->walletTransactions()->where('type', 'refund')->lockForUpdate()->get()->sum('amount_cents');
+                        if (($requested->get($item->external_line_id)['amount_cents'] ?? 0) !== $remaining) {
+                            $this->invalid('items', 'È richiesto il rimborso totale del sottoordine.');
+                        }
+                    }
+                }
             }
             foreach ($data['items'] as $line) {
                 $item = $sale->items()->where('external_line_id', $line['external_line_id'])->lockForUpdate()->first();
                 if (! $item) {
                     $this->invalid('items', 'Riga non presente nella vendita.');
+                }
+                $order = VendorOrder::whereKey($item->vendor_order_id)->lockForUpdate()->firstOrFail();
+                if ($order->status === 'cancelled') {
+                    $this->invalid('status', 'Sottoordine annullato.');
                 }
                 $entries = $item->walletTransactions()->lockForUpdate()->get();
                 $refunded = BigInteger::zero();
@@ -121,15 +202,30 @@ class SaleAccounting
                 if ($credit?->available_at && $credit->available_at > $available) {
                     $available = $credit->available_at;
                 }
+                if ($cumulative->isEqualTo($item->line_total_cents)) {
+                    app(OrderStock::class)->restore($item, $order);
+                }
                 $key = 'refund:'.$event->id.':'.$item->id;
                 $this->movement($item, $event, 'refund', -$line['amount_cents'], $key.':gross', $available, 'Rimborso vendita');
                 $this->movement($item, $event, 'adjustment', $commission, $key.':commission', $available, 'Rimborso commissione');
             }
-            $refunded = BigInteger::zero();
-            foreach (WalletTransaction::whereIn('sale_item_id', $lines->pluck('id'))->where('type', 'refund')->lockForUpdate()->get() as $entry) {
-                $refunded = $refunded->minus($entry->amount_cents);
+            foreach ($sale->vendorOrders()->lockForUpdate()->get() as $order) {
+                $ids = $order->items()->pluck('id');
+                $amount = -(int) WalletTransaction::whereIn('sale_item_id', $ids)->where('type', 'refund')->lockForUpdate()->get()->sum('amount_cents');
+                if ($amount === 0 || ! $order->items()->whereIn('external_line_id', array_column($data['items'], 'external_line_id'))->exists()) {
+                    continue;
+                }
+                $status = $amount === (int) $order->items()->lockForUpdate()->get()->sum('line_total_cents') ? 'refunded' : 'partially_refunded';
+                if ($status === 'refunded') {
+                    foreach ($order->items()->where('line_total_cents', 0)->lockForUpdate()->get() as $freeItem) {
+                        app(OrderStock::class)->restore($freeItem, $order);
+                    }
+                }
+                $before = $order->status;
+                $order->update(['status' => $status]);
+                app(OperationalLifecycle::class)->record($order, $before, $status, metadata: ['integration_event_id' => $event->id, 'refunded_cents' => $amount]);
             }
-            $sale->update(['status' => $refunded->isEqualTo($sale->total_cents) ? 'refunded' : 'partially_refunded']);
+            app(OperationalLifecycle::class)->aggregate($sale);
             $this->processed($event);
 
             return $sale;

@@ -50,7 +50,7 @@ final readonly class FinancialEventData
         if ($refund) {
             $rules += ['external_refund_id' => ['required', 'string', 'max:191'], 'items.*.amount_cents' => ['required', $integer]];
         } else {
-            $rules += ['items.*.inventory_item_id' => ['required', 'integer', 'min:1'], 'items.*.retailer_id' => ['required', 'integer', 'min:1'], 'items.*.quantity' => ['required', 'regex:/^[0-9]+(?:\.[0-9]{1,3})?$/'], 'items.*.unit_price_cents' => ['required', $integer], 'items.*.discount_cents' => ['sometimes', $integer]];
+            $rules += ['items.*.delivery_method' => ['sometimes', 'in:shipping,pickup'], 'items.*.inventory_item_id' => ['required', 'integer', 'min:1'], 'items.*.retailer_id' => ['required', 'integer', 'min:1'], 'items.*.quantity' => ['required', 'regex:/^[0-9]+(?:\.[0-9]{1,3})?$/'], 'items.*.unit_price_cents' => ['required', $integer], 'items.*.discount_cents' => ['sometimes', $integer]];
         }
         $valid = Validator::make($input, $rules)->validate();
         $data = ['provider' => $valid['provider'], 'external_order_id' => $valid['external_order_id'], 'timestamp' => CarbonImmutable::parse($valid['timestamp'])->utc()->format('Y-m-d H:i:s'), 'items' => []];
@@ -78,7 +78,7 @@ final readonly class FinancialEventData
                 if ($quantity <= 0) {
                     self::invalid('quantity', 'La quantità deve essere positiva.');
                 }
-                $data['items'][] = ['external_line_id' => $line['external_line_id'], 'inventory_item_id' => (int) $line['inventory_item_id'], 'retailer_id' => (int) $line['retailer_id'], 'quantity_milliunits' => $quantity, 'unit_price_cents' => $price, 'discount_cents' => ExactInteger::parse($line['discount_cents'] ?? 0)];
+                $data['items'][] = ['external_line_id' => $line['external_line_id'], ...(isset($line['delivery_method']) ? ['delivery_method' => $line['delivery_method']] : []), 'inventory_item_id' => (int) $line['inventory_item_id'], 'retailer_id' => (int) $line['retailer_id'], 'quantity_milliunits' => $quantity, 'unit_price_cents' => $price, 'discount_cents' => ExactInteger::parse($line['discount_cents'] ?? 0)];
             }
         }
         usort($data['items'], fn ($a, $b) => strcmp($a['external_line_id'], $b['external_line_id']));
