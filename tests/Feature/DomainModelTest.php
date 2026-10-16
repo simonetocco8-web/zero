@@ -26,12 +26,12 @@ use App\Support\MoneyMath;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
 use Tests\TestCase;
 
 class DomainModelTest extends TestCase

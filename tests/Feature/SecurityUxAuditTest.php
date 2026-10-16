@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\ProcessIntegrationEvent;
+use App\Models\Category;
 use App\Models\IntegrationEvent;
 use App\Models\InventoryItem;
 use App\Models\PayoutRequest;
@@ -13,13 +14,13 @@ use App\Models\User;
 use App\Services\InventoryPhotos;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
 use Tests\TestCase;
 
 class SecurityUxAuditTest extends TestCase
@@ -67,7 +68,7 @@ class SecurityUxAuditTest extends TestCase
     {
         $retailer = $this->retailer();
         $this->actingAs($retailer->user)->post(route('retailer.stock.store'), [
-            'name' => 'Prodotto', 'category' => 'Edilizia', 'quantity' => '1', 'zero_price' => '1.00', 'condition' => 'new',
+            'name' => 'Prodotto', 'category_id' => Category::where('slug', 'edilizia')->sole()->id, 'quantity' => '1', 'zero_price' => '1.00', 'condition' => 'new',
             'province' => 'MI', 'description' => 'Descrizione', 'pickup_available' => '1', 'intent' => 'pending',
             'sku' => str_repeat('s', 192), 'ean' => str_repeat('1', 192),
         ])->assertSessionHasErrors(['sku', 'ean']);
@@ -115,7 +116,7 @@ class SecurityUxAuditTest extends TestCase
         $retailer = $this->retailer();
         $item = InventoryItem::factory()->create(['retailer_id' => $retailer->id, 'shipping_available' => true]);
         $this->actingAs($retailer->user)->from(route('retailer.stock.edit', $item))->put(route('retailer.stock.update', $item), [
-            'name' => 'Nome conservato', 'category' => 'Edilizia', 'quantity' => '1', 'zero_price' => '1.00',
+            'name' => 'Nome conservato', 'category_id' => Category::where('slug', 'edilizia')->sole()->id, 'quantity' => '1', 'zero_price' => '1.00',
             'condition' => 'new', 'province' => 'MI', 'description' => '', 'pickup_available' => '1',
             'shipping_available' => '0', 'intent' => 'pending',
         ])->assertRedirect(route('retailer.stock.edit', $item));

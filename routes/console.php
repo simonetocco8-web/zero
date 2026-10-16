@@ -4,8 +4,12 @@ use App\Jobs\ProcessStorePublication;
 use App\Models\BillingSubscription;
 use App\Models\IntegrationEvent;
 use App\Models\StorePublication;
+use App\Services\ExchangeWorkflow;
 use App\Services\Integrations\IntegrationQueue;
 use App\Services\Integrations\WebhookInbox;
+use App\Services\MarketplaceNotices;
+use App\Services\Payments\ReconcileMarketplacePayments;
+use App\Services\StockReservations;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -66,3 +70,26 @@ Artisan::command('billing:sync', function () {
 Schedule::command('store:sync')->everyMinute()->withoutOverlapping();
 Schedule::command('integrations:retry')->everyMinute()->withoutOverlapping();
 Schedule::command('billing:sync')->hourly()->withoutOverlapping();
+
+Artisan::command('marketplace:expire-reservations', function () {
+    $count = app(StockReservations::class)->expire();
+    $this->info("Scadenze marketplace elaborate: $count");
+})->purpose('Expire marketplace stock holds atomically and idempotently');
+Schedule::command('marketplace:expire-reservations')->everyMinute();
+
+Artisan::command('marketplace:expire-exchanges', function () {
+    $count = app(ExchangeWorkflow::class)->expire();
+    $this->info("Scambi scaduti: $count");
+});
+Schedule::command('marketplace:expire-exchanges')->everyMinute();
+
+Artisan::command('marketplace:dispatch-notifications', function () {
+    $this->info('Notifiche accodate: '.app(MarketplaceNotices::class)->recover());
+});
+Schedule::command('marketplace:dispatch-notifications')->everyMinute();
+
+Artisan::command('marketplace:reconcile-payments', function () {
+    app(ReconcileMarketplacePayments::class)->handle();
+    $this->info('Riconciliazione pagamenti marketplace completata.');
+})->purpose('Reconcile pending refunds and refund late captures without consuming expired stock');
+Schedule::command('marketplace:reconcile-payments')->everyMinute()->withoutOverlapping();

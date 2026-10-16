@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\InventoryCondition;
 use App\Enums\InventoryStatus;
+use App\Models\Category;
 use App\Models\InventoryItem;
 use App\Models\Retailer;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -17,7 +18,8 @@ class InventoryItemFactory extends Factory
             'retailer_id' => Retailer::factory(),
             'name' => fake()->words(3, true),
             'brand' => fake()->company(),
-            'category' => 'materiali_edili',
+            'category' => 'Edilizia',
+            'category_id' => fn () => Category::where('slug', 'edilizia')->sole()->id,
             'sku' => fake()->uuid(),
             'quantity' => '1.000',
             'currency' => 'EUR',

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
+use App\Http\Controllers\Auth\CustomerRegistrationController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
@@ -12,6 +13,8 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
+    Route::get('customer/register', [CustomerRegistrationController::class, 'create'])->name('customer.register');
+    Route::post('customer/register', [CustomerRegistrationController::class, 'store'])->middleware('throttle:6,1');
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 

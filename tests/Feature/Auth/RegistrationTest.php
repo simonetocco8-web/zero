@@ -3,7 +3,7 @@
 namespace Tests\Feature\Auth;
 
 use Database\Seeders\PlanSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
 use Tests\TestCase;
 
 class RegistrationTest extends TestCase

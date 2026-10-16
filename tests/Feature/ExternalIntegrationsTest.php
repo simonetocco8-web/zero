@@ -19,10 +19,10 @@ use App\Services\Integrations\IntegrationQueue;
 use App\Services\Store\FakeStoreGateway;
 use App\Services\WalletBalance;
 use Database\Seeders\PlanSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
 use Tests\TestCase;
 
 class ExternalIntegrationsTest extends TestCase

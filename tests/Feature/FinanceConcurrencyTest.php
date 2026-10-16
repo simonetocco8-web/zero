@@ -10,10 +10,10 @@ use App\Models\Subscription;
 use App\Services\SaleAccounting;
 use App\Services\WalletBalance;
 use Database\Seeders\PlanSeeder;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Process\Process;
+use Tests\Concerns\AdditiveDatabaseMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
 class FinanceConcurrencyTest extends TestCase

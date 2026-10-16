@@ -57,8 +57,8 @@ class SaleAccounting
                 if ($gross < 0) {
                     $this->invalid('discount_cents', 'Lo sconto supera il valore della riga.');
                 }
-                $commission = MoneyMath::commissionCents($gross, $plan->commission_basis_points);
-                $item = $sale->items()->create([...$line, 'name' => $product->name, 'sku' => $product->sku, 'unit' => $product->unit, 'currency' => 'EUR', 'line_total_cents' => $gross, 'commission_basis_points' => $plan->commission_basis_points, 'commission_cents' => $commission, 'net_cents' => $gross - $commission]);
+                $commission = MoneyMath::commissionCents($gross, app(MarketplaceCommission::class)->saleRate($plan->code));
+                $item = $sale->items()->create([...$line, 'name' => $product->name, 'sku' => $product->sku, 'unit' => $product->unit, 'currency' => 'EUR', 'line_total_cents' => $gross, 'commission_basis_points' => app(MarketplaceCommission::class)->saleRate($plan->code), 'commission_cents' => $commission, 'net_cents' => $gross - $commission]);
                 $available = CarbonImmutable::parse($data['timestamp'])->addDays(config('finance.credit_maturation_days', 0));
                 $this->movement($item, $event, 'sale_credit', $gross, 'sale:'.$item->id.':credit', $available, 'Vendita');
                 $this->movement($item, $event, 'commission', -$commission, 'sale:'.$item->id.':commission', $available, 'Commissione vendita');

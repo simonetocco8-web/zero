@@ -35,6 +35,7 @@ class SaveInventoryItem
                     if ($stored) {
                         $removed = $current->proposed_images ?? [];
                     }
+                    $current->proposed_stock_version = $current->stock_version;
                     $current->proposed_data = $data;
                     $current->proposed_images = $images;
                     $current->status = 'change_pending';
@@ -43,6 +44,9 @@ class SaveInventoryItem
                 } else {
                     $current ??= new InventoryItem;
                     $current->fill($data);
+                    if ($current->exists && $current->isDirty('quantity_milliunits')) {
+                        $current->stock_version++;
+                    }
                     $current->retailer_id = $retailer->id;
                     $current->status = $input['intent'];
                     $current->submitted_at = $input['intent'] === 'pending' ? now() : null;

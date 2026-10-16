@@ -6,10 +6,16 @@ use App\Enums\InventoryStatus;
 use App\Enums\UserRole;
 use App\Models\InventoryItem;
 use App\Models\User;
+use App\Services\PublicInventory;
 use Illuminate\Support\Facades\Gate;
 
 class InventoryItemPolicy
 {
+    public function viewPublic(?User $user, InventoryItem $item): bool
+    {
+        return app(PublicInventory::class)->isAvailable($item);
+    }
+
     public function create(User $user): bool
     {
         return $user->retailer && Gate::forUser($user)->allows('operate', $user->retailer);

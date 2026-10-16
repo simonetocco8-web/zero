@@ -1,0 +1,9 @@
+@php($layout=match(auth()->user()->role->value){'admin'=>'layouts.admin','retailer'=>'layouts.retailer',default=>'layouts.customer'})
+<x-dynamic-component :component="$layout" title="Notifiche">
+    <h1>Notifiche</h1>
+    @if(session('status'))<x-alert>{{ session('status') }}</x-alert>@endif
+    <div class="my-5 flex flex-wrap gap-3"><x-button :href="route('notifications.index')" variant="secondary">Tutte</x-button><x-button :href="route('notifications.index',['unread'=>1])" variant="secondary">Da leggere</x-button></div>
+    <x-card class="my-5"><h2>Preferenze email</h2><form method="POST" action="{{ route('notifications.preferences') }}" class="mt-4 space-y-3">@csrf<input type="hidden" name="email_notifications" value="0"><label class="flex min-h-11 items-center gap-3"><input type="checkbox" name="email_notifications" value="1" @checked($user->marketplace_email_notifications)> Ricevi aggiornamenti marketplace anche via email</label><x-button type="submit" variant="secondary">Salva preferenze</x-button></form></x-card>
+    <div class="space-y-4">@forelse($notices as $notice)<x-card><h2>{{ $notice->data['title'] ?? 'Aggiornamento' }}</h2><p class="mt-3">{{ $notice->data['message'] ?? '' }}</p><p class="mt-2 text-sm">{{ $notice->created_at->format('d/m/Y H:i') }} · {{ $notice->read_at ? 'Letta':'Da leggere' }}</p><div class="mt-4 flex flex-wrap gap-3">@if(!empty($notice->data['path']))<x-button :href="$notice->data['path']" variant="secondary">Vedi dettagli</x-button>@endif @if(!$notice->read_at)<form method="POST" action="{{ route('notifications.read',$notice->id) }}">@csrf @method('PATCH')<x-button type="submit" variant="secondary">Segna come letta</x-button></form>@endif</div></x-card>@empty<p>Nessuna notifica.</p>@endforelse</div>
+    <div class="mt-5">{{ $notices->links() }}</div>
+</x-dynamic-component>

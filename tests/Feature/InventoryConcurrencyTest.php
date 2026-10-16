@@ -7,10 +7,10 @@ use App\Models\Plan;
 use App\Models\Retailer;
 use App\Models\Subscription;
 use Database\Seeders\PlanSeeder;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Process\Process;
+use Tests\Concerns\AdditiveDatabaseMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
 class InventoryConcurrencyTest extends TestCase
@@ -48,7 +48,7 @@ $app=require getcwd().'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 $until=microtime(true)+10; while(!file_exists($argv[2]) && microtime(true)<$until) usleep(10000);
 try {
- app(App\Actions\SaveInventoryItem::class)->handle(App\Models\User::findOrFail($argv[1]),['name'=>'Concurrent','category'=>'Materiali','quantity'=>'1','zero_price'=>'1','condition'=>'new','province'=>'Roma','description'=>'Test','pickup_available'=>true,'intent'=>'pending']);
+ app(App\Actions\SaveInventoryItem::class)->handle(App\Models\User::findOrFail($argv[1]),['name'=>'Concurrent','category_id'=>App\Models\Category::where('slug','edilizia')->sole()->id,'quantity'=>'1','zero_price'=>'1','condition'=>'new','province'=>'Roma','description'=>'Test','pickup_available'=>true,'intent'=>'pending']);
  exit(0);
 } catch (Illuminate\Validation\ValidationException $e) { exit((isset($e->errors()['plan']) || isset($e->errors()['quantity'])) ? 3:4); }
 CODE);

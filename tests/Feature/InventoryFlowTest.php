@@ -3,16 +3,17 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
+use App\Models\Category;
 use App\Models\InventoryItem;
 use App\Models\Plan;
 use App\Models\Retailer;
 use App\Models\Subscription;
 use App\Models\User;
 use Database\Seeders\PlanSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
+use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
 use Tests\TestCase;
 
 class InventoryFlowTest extends TestCase
@@ -33,7 +34,7 @@ class InventoryFlowTest extends TestCase
 
     private function data(array $extra = []): array
     {
-        return array_replace(['name' => 'Piastrella', 'category' => 'Pavimenti', 'quantity' => '1', 'zero_price' => '100.00', 'list_price' => null, 'condition' => 'new', 'province' => 'Roma', 'description' => 'Piastrelle disponibili', 'pickup_available' => '1', 'intent' => 'pending'], $extra);
+        return array_replace(['name' => 'Piastrella', 'category_id' => Category::where('slug', 'edilizia')->sole()->id, 'quantity' => '1', 'zero_price' => '100.00', 'list_price' => null, 'condition' => 'new', 'province' => 'Roma', 'description' => 'Piastrelle disponibili', 'pickup_available' => '1', 'intent' => 'pending'], $extra);
     }
 
     private function item(array $extra = []): InventoryItem

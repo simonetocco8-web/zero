@@ -6,7 +6,7 @@ use App\Enums\UserRole;
 use App\Models\Retailer;
 use App\Models\User;
 use Database\Seeders\PlanSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
 use Tests\TestCase;
 
 class SmokeTest extends TestCase
