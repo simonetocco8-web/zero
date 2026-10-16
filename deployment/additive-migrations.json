@@ -1,0 +1,13 @@
+[
+  "2026_10_13_000001_add_marketplace_foundations",
+  "2026_10_13_000002_add_marketplace_catalog_indexes",
+  "2026_10_13_000003_create_marketplace_carts_and_orders",
+  "2026_10_13_000004_create_stock_reservations",
+  "2026_10_13_000005_create_exchanges",
+  "2026_10_13_000006_complete_marketplace_private_areas",
+  "2026_10_13_000007_align_marketplace_funds_flow",
+  "2026_10_16_000001_add_connect_payment_tracking",
+  "2026_10_16_000002_add_customer_promotional_bonus",
+  "2026_10_16_000003_add_provider_refund_requests",
+  "2026_10_16_000004_add_late_capture_reconciliation"
+]
