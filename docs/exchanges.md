@@ -1,6 +1,6 @@
 # Scambi versionati tra rivenditori PRO
 
-> Aggiornamento 16 ottobre 2026: il PDF pagamenti v1.0 e [marketplace-payments.md](marketplace-payments.md) prevalgono sui valori di sviluppo sotto. Checkout 15m, conguaglio 1440m, proposta 48h; conguaglio calcolato solo sui totali merce. Adapter Connect ora disponibile ma disabilitato per default; il wallet retailer non è spendibile e il bonus customer è separato. Nessun incasso live eseguito.
+> Aggiornamento 16 ottobre 2026: il PDF pagamenti v1.0 e [marketplace-payments.md](marketplace-payments.md) prevalgono sui valori di sviluppo sotto. Checkout 30m, conguaglio 1440m, proposta 48h; conguaglio calcolato solo sui totali merce. Adapter Connect ora disponibile ma disabilitato per default; il credito retailer maturato è spendibile anche con carta secondo la successiva istruzione vincolante del committente; il bonus customer è separato. Nessun incasso live eseguito.
 
 > Riallineamento successivo: [audit economico marketplace](marketplace-payments.md) e [ADR funds flow](adr/marketplace-funds-flow.md) prevalgono sui limiti storici qui descritti (fee scambio, TTL, trasporto e rimborso senza restock). I risultati di verifica riportati sotto descrivono la fase precedente.
 
@@ -54,7 +54,7 @@ Esiti paid dopo scadenza, rilascio, controproposta o perdita dei requisiti PRO r
 
 ## Scadenza e UI
 
-`MARKETPLACE_EXCHANGE_PROPOSAL_HOURS=48` è **un default di sviluppo**, configurabile da 1 a 168 ore, non una scelta commerciale definitiva. Ogni nuova versione crea una nuova scadenza proposta. Alla doppia accettazione la scadenza operativa diventa il minimo tra scadenza proposta e `MARKETPLACE_RESERVATION_MINUTES` (default di sviluppo 15 minuti). Retry non estendono il termine. Le riserve scadute non contano nella disponibilità anche prima del cleanup.
+`MARKETPLACE_EXCHANGE_PROPOSAL_HOURS=48` è **un default di sviluppo**, configurabile da 1 a 168 ore, non una scelta commerciale definitiva. Ogni nuova versione crea una nuova scadenza proposta. Alla doppia accettazione la scadenza operativa diventa il minimo tra scadenza proposta e `MARKETPLACE_RESERVATION_MINUTES` (default approvato 30 minuti). Retry non estendono il termine. Le riserve scadute non contano nella disponibilità anche prima del cleanup.
 
 `php artisan marketplace:expire-exchanges` è idempotente e schedulato ogni minuto. Anche marketplace:expire-reservations delega al cleanup scambi; esecuzioni sovrapposte sono sicure grazie ai lock e al ricontrollo. Ordini rimangono nel proprio percorso; riserve exchange non vengono trattate individualmente come riserve anonime. Il cleanup cancella gli intenti pendenti e registra expired senza eliminare lo storico o scadere confirmed/completed.
 

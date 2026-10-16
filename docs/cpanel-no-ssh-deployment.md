@@ -1,4 +1,116 @@
-# Prima installazione cPanel senza SSH o Terminale
+# cPanel senza SSH: aggiornamento del marketplace consolidato e prima installazione
+
+## Aggiornamento del database ESISTENTE — procedura corrente
+
+Questa procedura usa `main` consolidato a partire da
+`5fd789a1b3401bc0ca5d62984fecf3c4e7879234`. Il DB di produzione è popolato:
+**non ricaricare né eseguire `install-zero.php`**. La sezione prima installazione
+più sotto riguarda esclusivamente un altro database nuovo e vuoto.
+
+### Verificare PHP CLI tramite Cron Jobs
+
+Il provider deve confermare il percorso PHP CLI 8.4.1+, ad esempio
+`/opt/cpanel/ea-php84/root/usr/bin/php` (percorso esemplificativo da verificare).
+Da cPanel Cron Jobs eseguire temporaneamente `PHP_CLI -v` verso un log privato
+fuori da public_html. Controllare versione, estensioni pdo_mysql/pcntl e permessi;
+rimuovere subito il cron di prova. Non è necessario accesso SSH/Terminale.
+
+### Backup e release
+
+1. Salvare DB consistente con trigger/vincoli, .env, APP_KEY e storage/upload.
+   Verificare un restore isolato e annotare riferimento backup, conteggi e saldi.
+2. Usare **Build deploy package**, modalità `update` (default), sul commit revisionato.
+   La CI riutilizzabile deve passare sullo stesso SHA prima del job package.
+   Nome invariato: `zeromagazzino-deploy.zip`; scaricare anche SHA-256.
+3. Verificare checksum e `deployment/release.json`: SHA, hash migration e registry
+   `deployment/additive-migrations.json`. La registry autorizza le estensioni
+   marketplace di main 13/16 ottobre, non le migration del ramo obsoleto 4d9fa52.
+   L’allowlist richiede revisione del codice: non è un analizzatore automatico di SQL.
+4. Confrontare `migrations` del DB reale con la release; al primo aggiornamento
+   confrontare anche i file storici con il commit installato. Laravel non salva gli
+   hash storici nel DB. Pending sconosciute o non autorizzate bloccano il runner.
+   Non modificare manifest/registry sul server per aggirare un blocco.
+
+### Maintenance e copia file
+
+Sospendere cron queue/scheduler e attendere la fine dei worker attivi. Tramite cron
+temporaneo eseguire `PHP_CLI /home/ACCOUNT/apps/zero/artisan down`, verificare marker
+`storage/framework/down` e 503, poi rimuovere quel cron.
+
+Estrarre lo ZIP in staging privato e aggiornare solo codice/vendor/public/build
+nella root applicativa in maintenance. **Preservare .env, APP_KEY, storage, upload,
+marker installazione e journal release.** Non sostituire storage con la directory
+vuota dello ZIP. Rimuovere un eventuale vecchio public/install-zero.php: il pacchetto
+update lo esclude ma non può eliminare file già presenti. Document root sul solo public.
+Rimuovere solo le cache PHP generate della vecchia release in bootstrap/cache
+(config/routes/events/services/packages), senza cancellare codice o dati.
+
+### Preflight e applicazione una sola volta
+
+Sostituire PHP_CLI, ACCOUNT, SHA40 e BACKUP con valori verificati. Ogni comando sotto
+è un **cron temporaneo separato**: leggerne l’esito e rimuoverlo prima dello step seguente.
+Nessun segreto compare nella riga di comando; BACKUP è un riferimento non sensibile di 8–100 caratteri alfanumerici/punto/trattino/underscore, per esempio backup-20261016.
+
+```sh
+PHP_CLI /home/ACCOUNT/apps/zero/scripts/update-release.php --commit=SHA40 --backup=BACKUP > /home/ACCOUNT/zero-update-preflight.log 2>&1
+```
+
+Il preflight restituisce commit ed elenco pending senza migration/cache rebuild.
+Verificare l’elenco esatto, quindi:
+
+```sh
+PHP_CLI /home/ACCOUNT/apps/zero/scripts/update-release.php --commit=SHA40 --backup=BACKUP --run > /home/ACCOUNT/zero-update-result.log 2>&1
+```
+
+Il runner privato è CLI-only (HTTP 404), richiede production/debug false, MySQL,
+installazione esistente e maintenance. Verifica hash/allowlist, applica flock e
+scrive una receipt esclusiva per SHA **prima degli effetti**. Comandi fissi:
+config:clear, route:clear, view:clear; **migrate --force --no-interaction** (solo
+pending); config:cache, route:cache, view:cache, event:cache; queue:restart.
+Nessun fresh, refresh, reset, rollback, seed, SQL arbitrario o key:generate.
+
+`storage/app/release-updates/SHA40.json` conserva commit, riferimento backup,
+hash, pending, timestamp ed esito. Output/stack trace dei comandi non vengono
+mostrati. Il riferimento backup non prova da solo l’esistenza del backup: è un
+controllo obbligatorio del responsabile. La receipt resta consumata anche in caso
+di errore/timeout: replay dello stesso SHA rifiutato. Rimuovere immediatamente il
+cron di esecuzione, anche se pianificato ogni minuto.
+
+### Postflight e rimozione
+
+Verificare receipt completed, migrate:status tramite cron temporaneo, conteggi,
+saldi, dati cifrati e upload. Il runner **non** riapre automaticamente il sito.
+Solo dopo i controlli eseguire `PHP_CLI /home/ACCOUNT/apps/zero/artisan up`, rimuovere
+il cron, ripristinare cron queue/scheduler e verificare backlog/worker. queue:restart
+invia un segnale: non avvia né supervisiona processi. Servire anche la coda
+marketplace-notifications, oltre a integrations/default, e verificare i comandi
+marketplace:expire-reservations, marketplace:expire-exchanges,
+marketplace:reconcile-payments e notifiche presenti in schedule:list.
+
+Eliminare dal server scripts/update-release.php, ZIP/staging e tutti i cron temporanei;
+archiviare privatamente i log, conservare journal/manifest/backup. Verificare 404 per
+installer/script e inaccessibilità HTTP di .env/storage privato. Non cancellare il
+journal nei futuri rilasci.
+
+Se receipt started/failed o un timeout lascia uno stato dubbio: mantenere maintenance,
+cron sospesi e verificare migration/schema col provider. DDL MySQL non è tutto
+transazionale. Non eliminare receipt, non riprovare alla cieca, non cancellare righe,
+non fare rollback/reset. Un recupero richiede analisi dello stato reale e una nuova
+release revisionata. I test dell’updater usano DB nuovi e trattenuti, senza reset/drop.
+
+### Solo se Cron Jobs non può eseguire PHP CLI: design fallback web
+
+Chiedere prima conferma al provider. Il fallback progettato deve essere temporaneo,
+HTTPS reale e POST-only; token casuale 256 bit con digest in file privato, scadenza
+breve e binding al commit; compare costante, nessuna query string o token nei log.
+Sotto flock consumare token e creare receipt prima degli effetti, mantenendo il
+consumo anche dopo errore. Stessi gate manifest/DB/maintenance e comandi fissi;
+solo pending migrate/cache, niente fresh/rollback o input SQL/comandi/path.
+Risposte generiche senza stack/segreti, audit privato e nessuna riapertura automatica.
+Eliminare endpoint/token dopo uso e verificare 404/replay. Nessun updater web è
+attivato da questa release senza aver prima escluso la CLI e collaudato il fallback.
+
+## Prima installazione — esclusivamente DB NUOVO e VUOTO
 
 L’installer web è una **misura temporanea per la sola prima installazione**, necessaria perché questo hosting non offre CLI. Non sostituisce un sistema di deployment, non aggiorna installazioni esistenti e deve essere eliminato immediatamente dopo l’uso. Non modifica architettura, ruoli, prezzi o integrazioni applicative.
 
@@ -13,7 +125,7 @@ Per le foto è ancora necessario ImageMagick con JPEG/PNG/WebP, `proc_open` abil
 ## 2. Scaricare il pacchetto GitHub
 
 1. Il workflow `.github/workflows/build-deploy-package.yml` deve essere presente sul branch predefinito per comparire nella pagina Actions. Pubblicarlo/revisionarlo tramite la normale PR; non serve alcun secret di produzione nelle Actions.
-2. Aprire GitHub → repository → **Actions → Build deploy package → Run workflow**. Selezionare il ref revisionato; attendere che l’esecuzione risulti riuscita. La CI separata deve essere verde sullo stesso commit.
+2. Aprire GitHub → repository → **Actions → Build deploy package → Run workflow**. Per una prima installazione selezionare esplicitamente package_mode=initial-install e il ref revisionato; attendere che l’esecuzione risulti riuscita. La CI separata deve essere verde sullo stesso commit.
 3. Nella pagina della run scaricare l’artifact `zeromagazzino-deploy-COMMIT`. GitHub può avvolgere il file in un ulteriore ZIP: estrarre prima l’archivio artifact e ottenere **`zeromagazzino-deploy.zip`**.
 4. Conservare commit/run associati e un backup del pacchetto. Gli artifact scadono dopo 7 giorni. La generazione non distribuisce né contatta il server.
 
@@ -121,6 +233,13 @@ Se appare **“Installazione completata”** (HTTP 200):
 
 Se fallisce prima delle migration (bootstrap/DB/lock), correggere configurazione, permessi o hosting e riprovare. Se fallisce durante/dopo le migration, il DB può essere parzialmente inizializzato: l’installer lo rifiuterà al tentativo successivo. **Non cancellare tabelle o marker e non aggiungere un reset web**: chiedere al supporto di verificare stato/migration/cache e completare il recupero con strumenti amministrativi su staging/backup. MySQL DDL non è interamente transazionale; non è promesso rollback automatico. In caso di timeout/disconnessione controllare prima marker e DB, senza inviare subito una seconda richiesta.
 
-## Aggiornamenti successivi
+## Vincolo permanente
 
-Non reinstallare questo script su un’applicazione già avviata. Nuovi artifact vanno distribuiti preservando `.env`, APP_KEY, storage/upload e marker. Migration additive, rigenerazione cache/riavvio worker e rollback devono essere pianificati con il provider; l’installer iniziale non fornisce un meccanismo di aggiornamento senza CLI. Non sovrascrivere cache con quelle di un altro server e non sostituire lo storage esistente con quello vuoto dello ZIP.
+Per il DB esistente seguire la procedura di aggiornamento sopra. Il vecchio installer
+non è un updater; non ricaricarlo e non rigenerare APP_KEY. Le regole economiche
+approvate restano in marketplace-payments.md: credito retailer maturato spendibile anche con carta, bonus
+customer separato, Connect disabilitato finché i prerequisiti non sono verificati.
+
+### Release credito retailer e TTL checkout
+
+Su installazione esistente impostare esplicitamente `.env`: `MARKETPLACE_RESERVATION_MINUTES=30` e `MARKETPLACE_RETAILER_CREDIT_ENABLED=true`, rimuovendo eventuale override storico15. Ricostruire la cache configurazione con la procedura CLI sopra. `MARKETPLACE_EXECUTION_MODE=disabled` resta tale finché i prerequisiti di attivazione non sono verificati; il flag credito non abilita Stripe né chiamate live. Applicare la pending migration000005 inclusa nel manifest, verificare quantità/saldi e conservare journal; nessuna riserva storica viene estesa.

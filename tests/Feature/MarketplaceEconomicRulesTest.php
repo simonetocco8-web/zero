@@ -41,7 +41,7 @@ class MarketplaceEconomicRulesTest extends TestCase
         $this->assertSame('disabled', $production['economic_rules']['execution_mode']);
         $this->assertSame('stripe_connect_separate_charges_transfers', $production['economic_rules']['funds_flow']);
         $this->assertSame(50, $production['economic_rules']['exchange_commission_basis_points']);
-        $this->assertSame(15, $production['reservation_minutes']);
+        $this->assertSame(30, $production['reservation_minutes']);
         $this->assertSame(1440, $production['exchange_difference_payment_minutes']);
         config(['marketplace' => $production]);
         $this->assertSame(200, app(MarketplaceCommission::class)->saleRate('free'));

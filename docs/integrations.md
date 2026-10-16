@@ -137,3 +137,11 @@ Conservare APP_KEY, `.env`, mapping, receipt/ledger e storage privato. Runtime P
 EXISTING: ExternalIntegrationsTest/StripeSdkGatewayTest verificano firma/tempo/queue/replay, billing pagato vs pending, insolvency/cancel/downgrade, retry e gateway fake; BillingConcurrencyTest e FinanceConcurrencyTest provano concorrenza MySQL. Risultati della riesecuzione in [database.md](database.md#verifica-della-revisione). Nessun pagamento, SMTP o negozio reale è collaudato dalla suite.
 
 PLANNED: test catalogo/approvazione con gateway assente o in errore, nuovi namespace separati, callback ordine che non modifica PRO e callback PRO che non paga Order, reservation vs payment/expiry/scambio, settlement/refund singoli, notifiche dopo commit e regressione delle integrazioni opzionali conservate.
+
+## Audit finale: checkout PRO scaduto
+
+Il billing PRO resta separato dai pagamenti marketplace. Un intento open/creating
+oltre TTL non viene più chiuso automaticamente per aprirne un altro: la scadenza
+locale non dimostra che Stripe non abbia incassato. Occorre riconciliazione del
+provider prima di segnare esplicitamente expired e consentire un nuovo checkout.
+Riconciliare anche i record storici expired delle release precedenti.

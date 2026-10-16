@@ -13,7 +13,7 @@ return [
         'tax_verified' => env('MARKETPLACE_TAX_VERIFIED', false),
         'live_enabled' => env('MARKETPLACE_STRIPE_LIVE_ENABLED', false),
     ],
-    'credit' => ['retailer_spending_enabled' => false],
+    'credit' => ['retailer_spending_enabled' => env('MARKETPLACE_RETAILER_CREDIT_ENABLED', true)],
     'bonus' => ['validity_months' => 12, 'maximum_goods_basis_points' => 1000],
     'settlement' => ['delivery_hold_hours' => 72, 'payout_iso_weekday' => 1, 'provider_cost_allocation' => 'proportional_received_amount'],
     'economic_rules' => [
@@ -30,7 +30,7 @@ return [
         'cancellation_rules' => env('MARKETPLACE_CANCELLATION_RULES', 'pre_dispatch_review_v1'),
         'refund_rules' => env('MARKETPLACE_REFUND_RULES', 'full_pre_dispatch_review_after_v1'),
     ],
-    'reservation_minutes' => env('MARKETPLACE_RESERVATION_MINUTES', 15),
+    'reservation_minutes' => env('MARKETPLACE_RESERVATION_MINUTES', 30),
     'exchange_difference_payment_minutes' => env('EXCHANGE_DIFFERENCE_PAYMENT_MINUTES', 1440),
     'exchange_proposal_hours' => env('MARKETPLACE_EXCHANGE_PROPOSAL_HOURS', 48),
     'notifications' => ['channels' => ['database', 'mail'], 'queue_connection' => env('MARKETPLACE_NOTIFICATION_QUEUE_CONNECTION', 'database'), 'queue' => 'marketplace-notifications'],

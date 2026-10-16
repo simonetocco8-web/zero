@@ -41,7 +41,7 @@ class ReceiveMarketplaceStripeEvent
             throw new \InvalidArgumentException('Invalid marketplace session metadata.');
         }
         $payment = $kind === 'order' ? MarketplacePayment::where('order_id', $id)->firstOrFail() : ExchangeDifferencePayment::where('exchange_version_id', $id)->firstOrFail();
-        if ($payment->provider !== 'stripe_connect' || $payment->simulated || ($payment->reference !== null && $payment->reference !== $object->id) || $object->mode !== 'payment' || ! is_int($object->amount_total) || ($kind === 'order' ? ($payment->card_cents ?? $payment->amount_cents) : $payment->amount_cents) !== $object->amount_total || strtolower($payment->currency) !== $object->currency) {
+        if ($payment->card_cents === 0 || $payment->provider !== 'stripe_connect' || $payment->simulated || ($payment->reference !== null && $payment->reference !== $object->id) || $object->mode !== 'payment' || ! is_int($object->amount_total) || ($payment->card_cents ?? $payment->amount_cents) !== $object->amount_total || strtolower($payment->currency) !== $object->currency) {
             throw new \InvalidArgumentException('Marketplace session identity/amount mismatch.');
         }
         $target = $kind === 'order' ? Order::findOrFail($id) : $payment->version;

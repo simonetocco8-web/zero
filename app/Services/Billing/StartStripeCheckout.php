@@ -33,8 +33,8 @@ class StartStripeCheckout
 
             $current = BillingCheckout::where('retailer_id', $retailer->id)->whereIn('status', ['creating', 'open'])->lockForUpdate()->first();
             if ($current && $current->expires_at <= now()) {
-                $current->update(['status' => 'expired']);
-                $current = null;
+                // Local expiry cannot prove that the remote session was not paid.
+                $this->invalid('Checkout scaduto: verifica il pagamento precedente prima di avviarne un altro.');
             }
             if ($current) {
                 if ($current->billing_interval !== $interval) {

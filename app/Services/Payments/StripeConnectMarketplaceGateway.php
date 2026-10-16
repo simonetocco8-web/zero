@@ -55,7 +55,7 @@ class StripeConnectMarketplaceGateway implements ExchangePaymentGatewayInterface
         }
         $this->beneficiaries([$version->payee_retailer_id]);
 
-        return $this->session('exchange', $version->id, $version->difference_cents, $version->currency, $idempotencyKey, route('retailer.exchanges.show', $version->exchange));
+        return $this->session('exchange', $version->id, $version->payment->card_cents ?? $version->difference_cents, $version->currency, $idempotencyKey, route('retailer.exchanges.show', $version->exchange));
     }
 
     public function refund(string $intent, int $cents, string $key): array

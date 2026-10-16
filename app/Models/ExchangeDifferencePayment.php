@@ -12,7 +12,7 @@ class ExchangeDifferencePayment extends Model
 
     protected function casts(): array
     {
-        return ['expires_at' => 'immutable_datetime', 'amount_cents' => ExactIntegerCast::class, 'simulated' => 'boolean'];
+        return ['retailer_credit_cents' => ExactIntegerCast::class, 'card_cents' => ExactIntegerCast::class, 'funding_snapshot' => 'array', 'expires_at' => 'immutable_datetime', 'amount_cents' => ExactIntegerCast::class, 'simulated' => 'boolean'];
     }
 
     public function version(): BelongsTo

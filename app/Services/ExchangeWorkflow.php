@@ -223,7 +223,8 @@ class ExchangeWorkflow
             $this->event($e, 'accepted');
             $this->stock->reserve($e, $v, $lines, $products);
             if ($v->difference_cents > 0) {
-                $v->payment()->create(['amount_cents' => $v->difference_cents, 'currency' => 'EUR', 'expires_at' => $e->expires_at]);
+                $credit = app(RetailerCredit::class)->reserve($v);
+                $v->payment()->create(['retailer_credit_cents' => $credit, 'card_cents' => $v->difference_cents - $credit, 'funding_snapshot' => ['policy' => 'matured_ledger_v1', 'retailer_credit_cents' => $credit, 'card_cents' => $v->difference_cents - $credit], 'amount_cents' => $v->difference_cents, 'currency' => 'EUR', 'expires_at' => $e->expires_at]);
                 $e->update(['status' => 'awaiting_difference_payment']);
                 $this->event($e, 'awaiting_difference_payment');
             } else {

@@ -6,6 +6,7 @@ use App\Contracts\MarketplacePaymentGatewayInterface;
 use App\Models\Order;
 use App\Services\CustomerPromotionalBonus;
 use App\Services\MarketplaceEconomicRules;
+use App\Services\RetailerCredit;
 use App\Services\StockReservations;
 use Illuminate\Support\Arr;
 
@@ -19,12 +20,20 @@ class StartMarketplacePayment
             if ($payment->status === 'paid') {
                 return false;
             }
-            if (! $stock->isActive($current, $reservations, $lines) || ! $stock->marketable($items) || ! app(CustomerPromotionalBonus::class)->active($current)) {
+            if (! $stock->isActive($current, $reservations, $lines) || ! $stock->marketable($items) || ! app(CustomerPromotionalBonus::class)->active($current) || ! app(RetailerCredit::class)->active($current)) {
                 $stock->fail();
             }
 
             if (! $payment->reference) {
                 $payment->update(['provider' => app(MarketplaceEconomicRules::class)->provider(), 'simulated' => ! app(MarketplaceEconomicRules::class)->isStripe()]);
+            }
+
+            if ($payment->card_cents === 0) {
+                $reference = 'credit-order:'.$current->id;
+                $payment->update(['reference' => $reference]);
+                app(ApplyMarketplacePaymentResult::class)->handle($current, $reference, $reference, 'paid', $current->total_cents, $current->currency, $payment->provider);
+
+                return false;
             }
 
             return ! $payment->reference;

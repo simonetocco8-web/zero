@@ -1,10 +1,21 @@
 # Modello dati — esistente e marketplace pianificato
 
+## Credito retailer spendibile — schema additivo
+
+`retailer_credit_holds`: fonte univoca `order_id` oppure `exchange_version_id`, `retailer_id`, centesimi EUR, flag simulated e stato reserved → spent/released. Owner/importo/fonte/valuta non modificabili; nessun campo balance. Fonte e ownership validate da trigger, storico non eliminabile.
+
+`wallet_transactions.retailer_credit_hold_id` collega scritture append-only di reservation, release, purchase/exchange spend e refund. Bucket available/reserved; solo available con available_at maturato entra nella disponibilità. Prenotazioni payout legacy e spesa condividono il lock Retailer; lettura corrente delle righe sotto lock. Fondi simulati non incidono sul saldo reale.
+
+`marketplace_payments.retailer_credit_cents`; `exchange_difference_payments.retailer_credit_cents`, `card_cents`, `funding_snapshot`. Snapshot credito/carta immutabili, allocazioni per vendor con resti maggiori/ID crescente; CHECK MySQL totale = carta + credito + bonus customer (quest'ultimo mai per retailer/conguagli). Storico card nullable preservato. Ledger promozionale customer resta distinto.
+
+La migration `2026_10_16_000005_add_retailer_credit_funding` aggiunge soltanto schema/indici/trigger ed estende il CHECK funding esistente senza riscrivere dati storici. Su SQLite l'ALTER nativo conserva tutti i trigger wallet preesistenti; su MySQL nuova foreign key. Nessun reset/rollback/rimozione dati; migrazione inclusa nell'allowlist cPanel. Dettagli commerciali in [marketplace-payments.md](marketplace-payments.md).
+
+
 ## EXISTING — schema additivo pagamenti e bonus del 16 ottobre 2026
 
 Quattro migration `2026_10_16_000001`–`000004`: `marketplace_connected_accounts`, `marketplace_stripe_receipts`, riferimenti PSP sulle due payment tables; `customer_bonus_grants` e `customer_bonus_entries` con ownership composita grant/user e order/user, trigger SQL append-only e scadenza per lotto; quote carta/bonus e funding snapshot immutabile per intento; `marketplace_provider_refunds` e `marketplace_late_capture_refunds` con chiavi idempotenti uniche e trigger sugli snapshot monetari. Ledger retailer preesistente conservato, senza colonna balance. Dati precedenti restano invariati; `card_cents=null` significa storico precedente, non bonus inventato. Dettagli e limiti in [marketplace-payments.md](marketplace-payments.md).
 
-> Stato corrente: decisioni PDF v1.0 approvate, Stripe Connect separate charges and transfers; credito retailer non spendibile, bonus customer separato. Attivazione subordinata a verifica provider/fiscale. Vedere [regole correnti](marketplace-payments.md). I paragrafi precedenti sono storici.
+> Stato corrente: decisioni PDF v1.0 approvate, Stripe Connect separate charges and transfers; credito retailer maturato spendibile anche con carta, bonus customer separato. Attivazione subordinata a verifica provider/fiscale. Vedere [regole correnti](marketplace-payments.md). I paragrafi precedenti sono storici.
 
 ## APPROVED / EXISTING — riallineamento economico marketplace
 
@@ -18,11 +29,9 @@ Aree cliente, vendite retailer e registri admin integrate con ownership e pagina
 
 Exchange, versioni/righe immutabili e sigillate, doppia acceptance sulla versione corrente, conguaglio merci separato da trasporto/IVA/commissioni, stock condiviso con gli acquisti, gateway fake, scadenza, completamento reciproco e area Scambi sono ora implementati. Solo retailer PRO attivi e approved negoziano; fiscalità irrisolta impedisce l'incasso simulato. Migration additiva, nessun pagamento reale o Stripe Connect. Le sezioni storiche che indicano Exchange PLANNED sono superate da questo stato: dettagli e limiti in [exchanges.md](exchanges.md).
 
-
 ## EXISTING — prenotazioni stock, stato aggiornato
 
 Checkout e pagamento fake utilizzano ora StockReservation nel database: disponibilità fisica meno prenotazioni attive non scadute, lock ordinati, consumo/rilascio atomici, idempotenza checkout/intent/eventi e scadenza schedulabile. IVA indefinita continua a impedire l'incasso simulato. Le precedenti sezioni che indicano reservation PLANNED o assente descrivono lo stato storico, superato da questa implementazione. Contratti, TTL di sviluppo, limiti e verifica in [stock-reservations.md](stock-reservations.md).
-
 
 ## EXISTING — carrello e ordini simulati
 

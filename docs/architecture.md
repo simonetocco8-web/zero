@@ -4,7 +4,7 @@
 
 `StripeConnectMarketplaceGateway` implementa contratti marketplace e conguaglio con client/configurazione distinti dal billing. `ReceiveMarketplaceStripeEvent` verifica la firma e normalizza nel dominio stock/ledger esistente. `CustomerPromotionalBonus` registra grant, prenotazione, spesa, release e ripristino in un ledger indipendente dal wallet retailer. `RefundMarketplaceVendor` separa intent PSP e finalizzazione transazionale; `ReconcileMarketplacePayments` gestisce retry e incassi tardivi. Provider disabilitato per default; rilascio credito reale/payout ancora bloccato. Limiti operativi in [marketplace-payments.md](marketplace-payments.md).
 
-> Stato corrente: decisioni PDF v1.0 approvate, Stripe Connect separate charges and transfers; credito retailer non spendibile, bonus customer separato. Attivazione subordinata a verifica provider/fiscale. Vedere [regole correnti](marketplace-payments.md). I paragrafi precedenti sono storici.
+> Stato corrente: decisioni PDF v1.0 approvate, Stripe Connect separate charges and transfers; credito retailer maturato spendibile anche con carta, bonus customer separato. Attivazione subordinata a verifica provider/fiscale. Vedere [regole correnti](marketplace-payments.md). I paragrafi precedenti sono storici.
 
 ## APPROVED / EXISTING — riallineamento economico marketplace
 

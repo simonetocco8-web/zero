@@ -113,6 +113,7 @@ class VendorOrderWorkflow
             $from = $v->status->value;
             $returns->restoreBeforeDispatch($case, $v);
             app(MarketplaceLedger::class)->reverseVendor($v, $case->id);
+            app(RetailerCredit::class)->refundVendor($order, $v->id);
             $bonus = $payment->funding_snapshot['bonus_by_vendor'][$v->id] ?? 0;
             if ($bonus > 0) {
                 app(CustomerPromotionalBonus::class)->refund($order, $bonus, 'vendor:'.$v->id);

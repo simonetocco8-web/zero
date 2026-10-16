@@ -2,12 +2,22 @@ name: Build deploy package
 
 on:
   workflow_dispatch:
+    inputs:
+      package_mode:
+        description: "update per DB esistente; initial-install soltanto per DB vuoto"
+        type: choice
+        required: true
+        default: update
+        options: [update, initial-install]
 
 permissions:
   contents: read
 
 jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
   package:
+    needs: verify
     name: Pacchetto cPanel / PHP 8.4 / Node 24
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -46,12 +56,18 @@ jobs:
           test -f vendor/autoload.php
           test -f public/build/manifest.json
       - name: Crea ZIP senza segreti o cache del runner
-        run: bash scripts/build-deploy-package.sh "$RUNNER_TEMP/zero-package"
+        env:
+          PACKAGE_MODE: ${{ inputs.package_mode }}
+        run: |
+          bash scripts/build-deploy-package.sh "$RUNNER_TEMP/zero-package" "$PACKAGE_MODE"
+          (cd "$RUNNER_TEMP/zero-package" && sha256sum zeromagazzino-deploy.zip > zeromagazzino-deploy.zip.sha256)
       - name: Artifact scaricabile
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: zeromagazzino-deploy-${{ github.sha }}
-          path: ${{ runner.temp }}/zero-package/zeromagazzino-deploy.zip
+          path: |
+            ${{ runner.temp }}/zero-package/zeromagazzino-deploy.zip
+            ${{ runner.temp }}/zero-package/zeromagazzino-deploy.zip.sha256
           if-no-files-found: error
           retention-days: 7
           compression-level: 0

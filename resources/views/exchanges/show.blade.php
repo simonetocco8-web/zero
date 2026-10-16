@@ -22,7 +22,10 @@
     <div class="my-5 flex flex-wrap gap-3">
         @if($exchange->status->open() && $exchange->expires_at>now())
             @can('negotiate',$exchange)
-                @if(!$version->acceptances->contains('retailer_id',auth()->user()->retailer->id))
+                @if($version->payer_retailer_id === auth()->user()->retailer->id && $version->difference_cents > 0 && config('marketplace.credit.retailer_spending_enabled'))
+<p class="my-3">Alla doppia accettazione sarà riservato il tuo credito retailer disponibile fino al conguaglio; il residuo sarà pagato con carta. Credito disponibile: {{ \App\Support\DisplayMoney::euros(app(\App\Services\RetailerCredit::class)->available(auth()->user()->retailer)) }}.</p>
+@endif
+@if(!$version->acceptances->contains('retailer_id',auth()->user()->retailer->id))
                     <form method="POST" action="{{ route('retailer.exchanges.accept',$exchange) }}">@csrf<input type="hidden" name="version_id" value="{{ $version->id }}"><input type="hidden" name="summary_hash" value="{{ $version->summary_hash }}"><x-button type="submit" :disabled="$version->difference_cents===0 && $version->payment_provisional">Accetta esattamente la versione {{ $version->number }}</x-button></form>
                 @endif
                 <x-button variant="secondary" :href="route('retailer.exchanges.edit',$exchange)">Crea controproposta</x-button>
@@ -30,7 +33,8 @@
             @foreach(['reject'=>'Rifiuta','cancel'=>'Annulla'] as $action=>$label)
                 <form method="POST" action="{{ route('retailer.exchanges.'.$action,$exchange) }}">@csrf<input type="hidden" name="version_id" value="{{ $version->id }}"><input type="hidden" name="summary_hash" value="{{ $version->summary_hash }}"><x-button type="submit" variant="secondary">{{ $label }}</x-button></form>
             @endforeach
-            @if($exchange->status->value==='awaiting_difference_payment')
+            @if($version->payment?->retailer_credit_cents)<p>Credito retailer riservato: {{ \App\Support\DisplayMoney::euros($version->payment->retailer_credit_cents) }} · Carta: {{ \App\Support\DisplayMoney::euros($version->payment->card_cents) }}.</p>@endif
+@if($exchange->status->value==='awaiting_difference_payment')
                 @can('simulatePayment',$exchange)
                     @if($version->payment?->provider === 'stripe_connect')
                     @if($version->payment?->checkout_url)<x-button :href="$version->payment->checkout_url">Paga il conguaglio con carta su Stripe</x-button>@endif

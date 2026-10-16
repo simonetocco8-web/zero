@@ -387,6 +387,18 @@ class ExternalIntegrationsTest extends TestCase
         $this->assertSame('sub_new', $current->billingSubscription->external_subscription_id);
     }
 
+    public function test_expired_pro_checkout_cannot_start_another_charge_before_reconciliation(): void
+    {
+        $this->travel(2)->hours();
+        $this->mock(StripeBillingGateway::class)->shouldNotReceive('createCheckout');
+        foreach (['open', 'creating'] as $status) {
+            $this->checkout->update(['status' => $status]);
+            $this->actingAs($this->retailer->user)->post(route('retailer.billing.checkout'), ['billing_interval' => 'monthly'])->assertSessionHasErrors('checkout');
+            $this->assertDatabaseCount('billing_checkouts', 1);
+            $this->assertSame($status, $this->checkout->fresh()->status);
+        }
+    }
+
     public function test_checkout_network_retry_reuses_same_server_intent(): void
     {
         $this->checkout->update(['status' => 'expired']);

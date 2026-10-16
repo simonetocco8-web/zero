@@ -43,7 +43,9 @@ class WalletBalance
         $sum = ExactInteger::parse($this->maturedEntries($retailer, $currency)
             ->whereIn('type', $this->reservationTypes())->sum('amount_cents'));
 
-        return BigInteger::of($sum)->negated()->toInt();
+        $credit = $retailer->walletTransactions()->where('currency', $currency)->where('simulated', false)->whereNotNull('retailer_credit_hold_id')->where('entry_bucket', 'reserved')->sum('amount_cents');
+
+        return BigInteger::of($sum)->negated()->plus((string) $credit)->toInt();
     }
 
     private function entries(Retailer $retailer, string $currency): Builder

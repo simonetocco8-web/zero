@@ -8,6 +8,7 @@ use App\Services\CustomerPromotionalBonus;
 use App\Services\MarketplaceEconomicRules;
 use App\Services\MarketplaceLedger;
 use App\Services\MarketplaceNotices;
+use App\Services\RetailerCredit;
 use App\Services\StockReservations;
 use Illuminate\Support\Facades\DB;
 
@@ -45,7 +46,7 @@ class ApplyMarketplacePaymentResult
                 $stock->releaseLocked($order, $payment, $reservations, 'expired');
                 // Retain a durable signal for a future provider's late-capture reconciliation.
                 $outcome = 'reconciliation_required';
-            } elseif (! app(CustomerPromotionalBonus::class)->active($order)) {
+            } elseif (! app(CustomerPromotionalBonus::class)->active($order) || ! app(RetailerCredit::class)->active($order)) {
                 $stock->releaseLocked($order, $payment, $reservations, 'expired');
                 $outcome = 'reconciliation_required';
             } elseif (! $stock->marketable($items)) {
@@ -70,6 +71,7 @@ class ApplyMarketplacePaymentResult
                     $reservation->update(['status' => 'consumed', 'consumed_at' => now()]);
                 }
                 app(CustomerPromotionalBonus::class)->finish($order, true);
+                app(RetailerCredit::class)->finish($order, true);
                 $payment->update(['status' => 'paid']);
                 $order->update(['status' => 'paid']);
                 $order->vendorOrders()->update(['status' => 'paid']);

@@ -4,6 +4,8 @@ set -euo pipefail
 
 output=${1:?Specificare una directory temporanea esterna al repository}
 root=$(pwd -P)
+mode=${2:-update}
+case "$mode" in update|initial-install) ;; *) echo "Modalità non valida" >&2; exit 1 ;; esac
 mkdir -p "$output"
 output=$(cd "$output" && pwd -P)
 case "$output/" in
@@ -28,6 +30,14 @@ tar -cf - \
   --exclude='database/*.sqlite' --exclude='database/*.sqlite-*' \
   app bootstrap config database public resources routes vendor artisan composer.json composer.lock \
   | tar -xf - -C "$output/deploy"
+
+# Never reintroduce the first-install endpoint in an existing installation.
+if [[ "$mode" == update ]]; then
+  rm -f "$output/deploy/public/install-zero.php"
+fi
+mkdir -p "$output/deploy/scripts" "$output/deploy/deployment"
+cp scripts/update-release.php "$output/deploy/scripts/update-release.php"
+php scripts/create-release-manifest.php "$root" "$output/deploy/deployment/release.json"
 
 # Storage nuovo e vuoto: mai copiare upload, log, sessioni o cache della macchina build.
 mkdir -p "$output/deploy"/{storage/app/private,storage/app/public,storage/framework/cache/data,storage/framework/cache/locks,storage/framework/sessions,storage/framework/views,storage/logs,bootstrap/cache}

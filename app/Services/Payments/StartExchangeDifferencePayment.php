@@ -8,6 +8,7 @@ use App\Services\ExchangeRules;
 use App\Services\ExchangeStock;
 use App\Services\ExchangeWorkflow;
 use App\Services\MarketplaceEconomicRules;
+use App\Services\RetailerCredit;
 use Illuminate\Support\Arr;
 
 class StartExchangeDifferencePayment
@@ -25,12 +26,20 @@ class StartExchangeDifferencePayment
             if ($p->status === 'paid') {
                 return false;
             }
-            if ($e->status->value !== 'awaiting_difference_payment' || ! app(ExchangeStock::class)->active($e, $v, $lines)) {
+            if ($e->status->value !== 'awaiting_difference_payment' || ! app(ExchangeStock::class)->active($e, $v, $lines) || ! app(RetailerCredit::class)->active($v)) {
                 app(ExchangeRules::class)->fail('payment', 'Scambio o prenotazioni non più validi.');
             }
 
             if (! $p->reference) {
                 $p->update(['provider' => app(MarketplaceEconomicRules::class)->provider(), 'simulated' => ! app(MarketplaceEconomicRules::class)->isStripe()]);
+            }
+
+            if ($p->card_cents === 0) {
+                $reference = 'credit-exchange:'.$v->id;
+                $p->update(['reference' => $reference]);
+                app(ApplyExchangePaymentResult::class)->handle($v, $reference, $reference, 'paid', $v->difference_cents, $v->currency, $p->provider);
+
+                return false;
             }
 
             return ! $p->reference;
@@ -39,7 +48,7 @@ class StartExchangeDifferencePayment
             return;
         }
         $intent = app(ExchangePaymentGatewayInterface::class)->createDifferenceIntent($version, 'exchange:'.$exchange->uuid.':version:'.$version->id);
-        if (($intent['provider'] ?? null) !== app(MarketplaceEconomicRules::class)->provider() || ($intent['simulated'] ?? null) !== ! app(MarketplaceEconomicRules::class)->isStripe() || ($intent['status'] ?? null) !== 'payment_pending' || ($intent['amount_cents'] ?? null) !== $version->difference_cents || ($intent['currency'] ?? null) !== $version->currency || ! is_string($intent['reference'] ?? null) || $intent['reference'] === '' || strlen($intent['reference']) > 191) {
+        if (($intent['provider'] ?? null) !== app(MarketplaceEconomicRules::class)->provider() || ($intent['simulated'] ?? null) !== ! app(MarketplaceEconomicRules::class)->isStripe() || ($intent['status'] ?? null) !== 'payment_pending' || ($intent['amount_cents'] ?? null) !== ($version->fresh()->payment->card_cents ?? $version->difference_cents) || ($intent['currency'] ?? null) !== $version->currency || ! is_string($intent['reference'] ?? null) || $intent['reference'] === '' || strlen($intent['reference']) > 191) {
             throw new \RuntimeException('Invalid fake exchange payment intent.');
         }
         $workflow->locked($exchange, function ($e, $v, $lines) use ($version, $intent) {
