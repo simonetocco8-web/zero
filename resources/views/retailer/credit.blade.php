@@ -1,9 +1,9 @@
 <x-layouts.retailer title="Credito maturato">
-<h1>Credito maturato</h1><p class="mt-2 text-slate-600">Vendite, rimborsi e bonifici in EUR. La commissione di ciascuna vendita resta quella registrata al momento della vendita.</p>
+<h1>Credito maturato</h1><p class="mt-3"><a class="underline" href="{{ route('retailer.connect.show') }}">Configura i pagamenti marketplace con Stripe</a></p><p class="mt-2 text-slate-600">Vendite, rimborsi e bonifici in EUR. La commissione di ciascuna vendita resta quella registrata al momento della vendita.</p>
 @if(session('status'))<x-alert class="mt-4" title="Operazione completata"><p>{{ session('status') }}</p></x-alert>@endif
 @if($errors->any())<x-alert class="mt-4" variant="danger" title="Richiesta non completata">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</x-alert>@endif
-<div class="mt-6 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-@foreach(['Credito disponibile'=>\App\Support\DisplayMoney::euros($available),'Totale netto maturato'=>\App\Support\DisplayMoney::euros($earned),'Bonifici in attesa'=>\App\Support\DisplayMoney::euros($reserved),'Commissione piano'=>$plan ? \App\Support\DisplayMoney::percent($plan->commission_basis_points) : 'Nessun piano attivo'] as $label=>$value)
+<x-card class="mt-5"><h2>Saldo marketplace</h2><p class="mt-3">In attesa: {{ \App\Support\DisplayMoney::euros($marketplaceBalances['pending']) }} · Liquidabile: {{ \App\Support\DisplayMoney::euros($marketplaceBalances['available']) }} · Bloccato: {{ \App\Support\DisplayMoney::euros($marketplaceBalances['reserved']) }}.</p><p class="mt-2">Il saldo non è spendibile per acquisti. I crediti in attesa richiedono verifica della consegna, assenza di contestazioni e riconciliazione provider prima della liquidazione.</p></x-card><div class="mt-6 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+@foreach(['Credito disponibile'=>\App\Support\DisplayMoney::euros($available),'Totale netto maturato'=>\App\Support\DisplayMoney::euros($earned),'Bonifici in attesa'=>\App\Support\DisplayMoney::euros($reserved),'Commissione piano'=>$plan ? app(\App\Services\MarketplaceCommission::class)->saleLabel($plan->code) : 'Nessun piano attivo'] as $label=>$value)
 <x-card><p class="text-sm text-slate-500">{{ $label }}</p><p class="mt-2 break-words text-xl font-semibold">{{ $value }}</p></x-card>@endforeach
 </div>
 <x-card class="mt-6"><h2>Ricevi il credito</h2><p class="mt-2">La richiesta comprende tutto il credito disponibile. La banca dispone il pagamento esternamente al gestionale.</p>

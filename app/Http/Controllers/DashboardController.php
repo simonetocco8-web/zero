@@ -10,6 +10,8 @@ class DashboardController extends Controller
 {
     public function __invoke(Request $request): RedirectResponse
     {
-        return to_route($request->user()->role === UserRole::Admin ? 'admin.dashboard' : 'retailer.dashboard');
+        return to_route(match ($request->user()->role) {
+            UserRole::Admin => 'admin.dashboard', UserRole::Retailer => 'retailer.dashboard', UserRole::Customer => 'customer.dashboard'
+        });
     }
 }

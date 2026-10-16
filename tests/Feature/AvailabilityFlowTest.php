@@ -6,7 +6,7 @@ use App\Models\AvailabilityRequest;
 use App\Models\InventoryItem;
 use App\Models\Retailer;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
 use Tests\TestCase;
 
 class AvailabilityFlowTest extends TestCase

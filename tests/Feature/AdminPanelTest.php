@@ -6,6 +6,7 @@ use App\Contracts\StoreGatewayInterface;
 use App\Enums\UserRole;
 use App\Jobs\ProcessStorePublication;
 use App\Models\AuditLog;
+use App\Models\Category;
 use App\Models\FakeStoreProduct;
 use App\Models\InventoryItem;
 use App\Models\PayoutRequest;
@@ -18,7 +19,7 @@ use App\Models\WalletTransaction;
 use App\Services\Store\FakeStoreGateway;
 use App\Services\WalletBalance;
 use Database\Seeders\PlanSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
 use Tests\TestCase;
 
 class AdminPanelTest extends TestCase
@@ -151,7 +152,7 @@ class AdminPanelTest extends TestCase
         $item = $this->pendingItem($retailer);
         $this->actingAs($this->admin)->patch(route('admin.stock.review', $item), ['decision' => 'published'])->assertSessionHasNoErrors();
         $originalId = $item->fresh()->external_product_id;
-        $this->actingAs($retailer->user)->put(route('retailer.stock.update', $item), ['name' => 'Nome aggiornato', 'category' => 'Materiali', 'quantity' => '1', 'zero_price' => '100', 'condition' => 'new', 'province' => 'Roma', 'description' => 'Nuova descrizione', 'pickup_available' => '1', 'intent' => 'pending'])->assertSessionHasNoErrors();
+        $this->actingAs($retailer->user)->put(route('retailer.stock.update', $item), ['name' => 'Nome aggiornato', 'category_id' => Category::where('slug', 'edilizia')->sole()->id, 'quantity' => '1', 'zero_price' => '100', 'condition' => 'new', 'province' => 'Roma', 'description' => 'Nuova descrizione', 'pickup_available' => '1', 'intent' => 'pending'])->assertSessionHasNoErrors();
         $this->assertNotSame('Nome aggiornato', FakeStoreProduct::sole()->payload['name']);
         $this->actingAs($this->admin)->patch(route('admin.stock.review', $item), ['decision' => 'published'])->assertSessionHasNoErrors();
         $this->assertSame($originalId, $item->fresh()->external_product_id);

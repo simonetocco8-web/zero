@@ -2,9 +2,13 @@
 
 namespace App\Providers;
 
+use App\Contracts\ExchangePaymentGatewayInterface;
+use App\Contracts\MarketplacePaymentGatewayInterface;
 use App\Contracts\StoreGatewayInterface;
 use App\Contracts\StripeBillingGateway;
 use App\Services\Billing\StripeSdkGateway;
+use App\Services\Payments\FakeMarketplacePaymentGateway;
+use App\Services\Payments\StripeConnectMarketplaceGateway;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
@@ -21,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(MarketplacePaymentGatewayInterface::class, fn () => $this->app->make(config('marketplace.economic_rules.execution_mode') === 'stripe_connect' ? StripeConnectMarketplaceGateway::class : FakeMarketplacePaymentGateway::class));
+        $this->app->bind(ExchangePaymentGatewayInterface::class, fn () => $this->app->make(config('marketplace.economic_rules.execution_mode') === 'stripe_connect' ? StripeConnectMarketplaceGateway::class : FakeMarketplacePaymentGateway::class));
         $this->app->bind(StoreGatewayInterface::class, function () {
             $driver = config('store.driver');
             $class = config("store.drivers.$driver.gateway");

@@ -10,7 +10,7 @@ return [
         'max_items' => 5,
         'max_inventory_value_cents' => 1000000,
         'exchange_available' => false,
-        'commission_basis_points' => 200,
+        'commission_basis_points' => config('marketplace.economic_rules.sale_commission_basis_points.free'),
     ],
     'pro' => [
         'name' => 'PRO',
@@ -20,6 +20,6 @@ return [
         'max_items' => null,
         'max_inventory_value_cents' => null,
         'exchange_available' => true,
-        'commission_basis_points' => 50,
+        'commission_basis_points' => config('marketplace.economic_rules.sale_commission_basis_points.pro'),
     ],
 ];

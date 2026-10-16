@@ -48,7 +48,7 @@ class WalletBalance
 
     private function entries(Retailer $retailer, string $currency): Builder
     {
-        return $retailer->walletTransactions()->getQuery()->where('currency', $currency);
+        return $retailer->walletTransactions()->getQuery()->where('currency', $currency)->where('simulated', false);
     }
 
     private function maturedEntries(Retailer $retailer, string $currency): Builder

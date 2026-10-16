@@ -31,10 +31,16 @@ class ReviewInventoryItem
                 if ($retailer->status->value !== 'approved') {
                     throw ValidationException::withMessages(['decision' => 'Il rivenditore non è approvato.']);
                 }
+                if ($item->proposed_data && $item->proposed_stock_version !== $item->stock_version) {
+                    throw ValidationException::withMessages(['decision' => 'La quantità fisica è cambiata dopo la proposta. Richiedi una nuova proposta prima di approvare.']);
+                }
                 $data = $item->proposed_data ?? $item->getAttributes();
                 app(InventoryRules::class)->validate($retailer, $data, $item);
                 if ($item->proposed_data) {
                     $item->fill($item->proposed_data);
+                    if ($item->isDirty('quantity_milliunits')) {
+                        $item->stock_version++;
+                    }
                     $item->images()->delete();
                     foreach ($item->proposed_images ?? [] as $position => $photo) {
                         $item->images()->create($photo + ['position' => $position]);
@@ -49,6 +55,7 @@ class ReviewInventoryItem
                 $item->status = $item->published_at ? 'published' : 'rejected';
                 $item->rejection_reason = $reason;
             }
+            $item->proposed_stock_version = null;
             $item->proposed_data = null;
             $item->proposed_images = null;
             $item->reviewed_by = $actor->id;

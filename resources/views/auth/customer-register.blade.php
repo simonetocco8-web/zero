@@ -1,0 +1,5 @@
+<x-guest-layout title="Registrazione cliente"><h1>Crea account cliente</h1><p class="my-4">Acquista come cliente senza registrare un'azienda rivenditrice.</p><form method="POST" action="{{ route('customer.register') }}" class="space-y-5">@csrf
+<x-field name="first_name" label="Nome" required autocomplete="given-name" /><x-field name="last_name" label="Cognome" required autocomplete="family-name" />
+<x-field name="email" label="Email" type="email" required autocomplete="email" /><x-field name="phone" label="Telefono (facoltativo)" type="tel" autocomplete="tel" />
+<x-field name="password" label="Password" type="password" required autocomplete="new-password" /><x-field name="password_confirmation" label="Conferma password" type="password" required autocomplete="new-password" />
+<x-button type="submit" class="w-full">Registrati come cliente</x-button></form><a class="mt-4 inline-flex min-h-11 items-center underline" href="{{ route('register') }}">Vuoi registrarti come rivenditore?</a></x-guest-layout>

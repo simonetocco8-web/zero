@@ -17,9 +17,9 @@ use App\Services\SaleAccounting;
 use App\Services\WalletBalance;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
 use Tests\TestCase;
 
 class SaleAccountingTest extends TestCase

@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'first_name', 'last_name', 'phone', 'marketplace_email_notifications'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -30,10 +30,26 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'marketplace_email_notifications' => 'boolean',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
         ];
+    }
+
+    public function cart(): HasOne
+    {
+        return $this->hasOne(Cart::class);
+    }
+
+    public function marketplaceOrders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    public function customerAddresses(): HasMany
+    {
+        return $this->hasMany(CustomerAddress::class);
     }
 
     public function retailer(): HasOne

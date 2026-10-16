@@ -5,12 +5,12 @@ namespace Tests\Feature;
 use App\Models\BillingCheckout;
 use App\Models\Retailer;
 use App\Services\Billing\StripeSdkGateway;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\ClientInterface;
 use Stripe\HttpClient\CurlClient;
 use Stripe\StripeClient;
+use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
 use Tests\TestCase;
 
 class StripeSdkGatewayTest extends TestCase

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\CurrencyCode;
 use App\Casts\ExactIntegerCast;
+use App\Models\Concerns\AppendOnly;
 use App\Models\Concerns\HasExactQuantity;
 use Database\Factories\SaleItemFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SaleItem extends Model
 {
+    use AppendOnly;
     use HasExactQuantity;
 
     /** @use HasFactory<SaleItemFactory> */

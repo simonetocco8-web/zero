@@ -1,0 +1,2 @@
+@props(['filters'=>[]])
+<form method="GET" class="my-5 flex flex-wrap items-end gap-3"><label class="block"><span class="field-label">Stato</span><select class="field" name="status"><option value="">Tutti</option>@foreach(\App\Enums\OrderStatus::cases() as $state)<option value="{{ $state->value }}" @selected(($filters['status']??'')===$state->value)>{{ $state->label() }}</option>@endforeach</select></label><x-button type="submit" variant="secondary">Filtra</x-button></form>

@@ -17,7 +17,11 @@ class InventoryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'], 'brand' => ['nullable', 'string', 'max:255'], 'category' => ['required', 'string', 'max:120'],
+            'name' => ['required', 'string', 'max:255'], 'brand' => ['nullable', 'string', 'max:255'], 'category_id' => ['required', 'integer', Rule::exists('categories', 'id')],
+            'unit' => ['sometimes', 'required', 'string', 'max:32'],
+            'shipping_cost' => ['nullable', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,2})?$/'],
+            'delivery_notes' => ['nullable', 'string', 'max:2000'],
+            'vat_treatment' => ['nullable', Rule::in(array_keys(config('marketplace.vat_treatments')))],
             'sku' => ['nullable', 'string', 'max:191', Rule::unique('inventory_items', 'sku')->where('retailer_id', $this->user()->retailer->id)->ignore($this->route('item')?->id)], 'ean' => ['nullable', 'string', 'max:191'],
             'quantity' => ['required', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,3})?$/'],
             'zero_price' => ['required', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,2})?$/'],

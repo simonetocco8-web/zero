@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\SaveInventoryItem;
 use App\Http\Requests\InventoryRequest;
+use App\Models\Category;
 use App\Models\InventoryItem;
 use App\Services\InventoryPhotos;
 use Illuminate\Http\Request;
@@ -23,7 +24,7 @@ class InventoryController extends Controller
     {
         Gate::authorize('create', InventoryItem::class);
 
-        return view('inventory.form', ['item' => new InventoryItem, 'data' => []]);
+        return view('inventory.form', ['item' => new InventoryItem, 'data' => [], 'categories' => Category::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get()]);
     }
 
     public function show(InventoryItem $item)
@@ -37,7 +38,7 @@ class InventoryController extends Controller
     {
         Gate::authorize('update', $item);
 
-        return view('inventory.form', ['item' => $item, 'data' => $item->proposed_data ?? $item->getAttributes()]);
+        return view('inventory.form', ['item' => $item, 'data' => $item->proposed_data ?? $item->getAttributes(), 'categories' => Category::where('is_active', true)->orWhereIn('id', array_filter([$item->category_id, $item->proposed_data['category_id'] ?? null]))->orderBy('sort_order')->orderBy('name')->get()]);
     }
 
     public function store(InventoryRequest $request, SaveInventoryItem $action)

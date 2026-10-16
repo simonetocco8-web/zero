@@ -7,9 +7,9 @@ use App\Models\Plan;
 use App\Models\Retailer;
 use App\Models\Subscription;
 use Database\Seeders\PlanSeeder;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
+use Tests\Concerns\AdditiveDatabaseMigrations as DatabaseMigrations;
 use Tests\TestCase;
 
 class BillingConcurrencyTest extends TestCase
