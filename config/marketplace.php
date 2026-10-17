@@ -1,9 +1,22 @@
 <?php
 
+// Environment files contain strings. Reject malformed/overflowing amounts rather than coercing them to zero.
+$integer = static function (string $key, ?int $default = null): ?int {
+    $value = env($key, $default);
+    if ($default === null && ($value === null || $value === '')) {
+        return null;
+    }
+    if ((! is_int($value) && ! is_string($value)) || ! preg_match('/^-?[0-9]+$/D', (string) $value) || filter_var($value, FILTER_VALIDATE_INT) === false) {
+        throw new InvalidArgumentException('Invalid integer configuration: '.$key);
+    }
+
+    return (int) $value;
+};
+
 return [
     // PDF v1.0: approval of rules does not enable live collection.
     'provider' => 'stripe_connect',
-    'commission_tax' => ['treatment' => env('MARKETPLACE_COMMISSION_VAT_TREATMENT'), 'rate_basis_points' => env('MARKETPLACE_COMMISSION_VAT_BASIS_POINTS')],
+    'commission_tax' => ['treatment' => env('MARKETPLACE_COMMISSION_VAT_TREATMENT'), 'rate_basis_points' => $integer('MARKETPLACE_COMMISSION_VAT_BASIS_POINTS')],
     'stripe' => [
         'secret' => env('MARKETPLACE_STRIPE_SECRET'),
         'mode' => env('MARKETPLACE_STRIPE_MODE', 'test'),
@@ -21,7 +34,7 @@ return [
         'funds_flow' => env('MARKETPLACE_FUNDS_FLOW', 'stripe_connect_separate_charges_transfers'),
         'sale_commission_basis_points' => ['free' => 200, 'pro' => 50],
         'sale_commission_base' => env('MARKETPLACE_SALE_COMMISSION_BASE', 'taxable_goods_excluding_shipping'),
-        'exchange_commission_basis_points' => env('MARKETPLACE_EXCHANGE_COMMISSION_BASIS_POINTS', 50),
+        'exchange_commission_basis_points' => $integer('MARKETPLACE_EXCHANGE_COMMISSION_BASIS_POINTS', 50),
         'exchange_commission_base' => env('MARKETPLACE_EXCHANGE_COMMISSION_BASE', 'paid_difference'),
         'exchange_commission_charged_to' => env('MARKETPLACE_EXCHANGE_COMMISSION_CHARGED_TO', 'payee'),
         'vat_rules' => env('MARKETPLACE_VAT_RULES', 'descriptive_snapshots_v1'),
@@ -30,9 +43,9 @@ return [
         'cancellation_rules' => env('MARKETPLACE_CANCELLATION_RULES', 'pre_dispatch_review_v1'),
         'refund_rules' => env('MARKETPLACE_REFUND_RULES', 'full_pre_dispatch_review_after_v1'),
     ],
-    'reservation_minutes' => env('MARKETPLACE_RESERVATION_MINUTES', 30),
-    'exchange_difference_payment_minutes' => env('EXCHANGE_DIFFERENCE_PAYMENT_MINUTES', 1440),
-    'exchange_proposal_hours' => env('MARKETPLACE_EXCHANGE_PROPOSAL_HOURS', 48),
+    'reservation_minutes' => $integer('MARKETPLACE_RESERVATION_MINUTES', 30),
+    'exchange_difference_payment_minutes' => $integer('EXCHANGE_DIFFERENCE_PAYMENT_MINUTES', 1440),
+    'exchange_proposal_hours' => $integer('MARKETPLACE_EXCHANGE_PROPOSAL_HOURS', 48),
     'notifications' => ['channels' => ['database', 'mail'], 'queue_connection' => env('MARKETPLACE_NOTIFICATION_QUEUE_CONNECTION', 'database'), 'queue' => 'marketplace-notifications'],
     // Presentation and explicitly supplied tax inputs; no default VAT rate.
     'tax_rates_basis_points' => [],

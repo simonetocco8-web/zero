@@ -50,6 +50,76 @@ class MarketplaceEconomicRulesTest extends TestCase
         $this->rejects(fn () => app(MarketplaceCommission::class)->difference(30000, 1));
     }
 
+    private function withNumericEnvironment(array $values, callable $check): void
+    {
+        $original = [];
+        foreach ($values as $key => $value) {
+            $original[$key] = [getenv($key), $_ENV[$key] ?? null, $_SERVER[$key] ?? null];
+            if ($value === null) {
+                putenv($key);
+                unset($_ENV[$key], $_SERVER[$key]);
+            } else {
+                putenv($key.'='.$value);
+                $_ENV[$key] = $_SERVER[$key] = $value;
+            }
+        }
+        try {
+            $check();
+        } finally {
+            foreach ($original as $key => [$process, $environment, $server]) {
+                $process === false ? putenv($key) : putenv($key.'='.$process);
+                if ($environment === null) {
+                    unset($_ENV[$key]);
+                } else {
+                    $_ENV[$key] = $environment;
+                }
+                if ($server === null) {
+                    unset($_SERVER[$key]);
+                } else {
+                    $_SERVER[$key] = $server;
+                }
+            }
+        }
+    }
+
+    public function test_numeric_environment_strings_produce_integer_configuration(): void
+    {
+        $this->withNumericEnvironment(['MARKETPLACE_EXCHANGE_COMMISSION_BASIS_POINTS' => '75', 'MARKETPLACE_RESERVATION_MINUTES' => '45', 'EXCHANGE_DIFFERENCE_PAYMENT_MINUTES' => '720', 'MARKETPLACE_EXCHANGE_PROPOSAL_HOURS' => '24', 'MARKETPLACE_COMMISSION_VAT_BASIS_POINTS' => '2200'], function () {
+            $config = require base_path('config/marketplace.php');
+            $this->assertSame(75, $config['economic_rules']['exchange_commission_basis_points']);
+            $this->assertSame(45, $config['reservation_minutes']);
+            $this->assertSame(720, $config['exchange_difference_payment_minutes']);
+            $this->assertSame(24, $config['exchange_proposal_hours']);
+            $this->assertSame(2200, $config['commission_tax']['rate_basis_points']);
+        });
+    }
+
+    public function test_optional_commission_vat_preserves_unconfigured_and_explicit_zero(): void
+    {
+        foreach ([null, '', 'null', '0'] as $value) {
+            $this->withNumericEnvironment(['MARKETPLACE_COMMISSION_VAT_BASIS_POINTS' => $value], function () use ($value) {
+                $config = require base_path('config/marketplace.php');
+                $this->assertSame($value === '0' ? 0 : null, $config['commission_tax']['rate_basis_points']);
+            });
+        }
+    }
+
+    public function test_invalid_numeric_environment_cannot_silently_become_zero(): void
+    {
+        foreach (['MARKETPLACE_EXCHANGE_COMMISSION_BASIS_POINTS', 'MARKETPLACE_RESERVATION_MINUTES', 'EXCHANGE_DIFFERENCE_PAYMENT_MINUTES', 'MARKETPLACE_EXCHANGE_PROPOSAL_HOURS', 'MARKETPLACE_COMMISSION_VAT_BASIS_POINTS'] as $key) {
+            foreach (['invalid', '0.5', '1e2', '99999999999999999999999', 'false'] as $value) {
+                $this->withNumericEnvironment([$key => $value], function () use ($key) {
+                    try {
+                        require base_path('config/marketplace.php');
+                        $this->fail('Malformed economic configuration accepted.');
+                    } catch (\InvalidArgumentException $e) {
+                        $this->assertSame('Invalid integer configuration: '.$key, $e->getMessage());
+                    }
+                });
+            }
+        }
+    }
+
     public function test_every_indispensable_rule_is_required_even_with_fake_gateway(): void
     {
         $fixture = require base_path('tests/Fixtures/marketplace-rules.php');
