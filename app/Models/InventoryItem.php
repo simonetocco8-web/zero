@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class InventoryItem extends Model
 {
@@ -23,6 +24,8 @@ class InventoryItem extends Model
 
     /** @use HasFactory<InventoryItemFactory> */
     use HasFactory;
+
+    use SoftDeletes;
 
     protected $attributes = ['status' => 'draft', 'condition' => 'new', 'unit' => 'piece', 'currency' => 'EUR', 'pickup_available' => false, 'shipping_available' => false, 'exchange_available' => false];
 

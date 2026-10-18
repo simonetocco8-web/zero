@@ -1,5 +1,9 @@
 # Modello dati — esistente e marketplace pianificato
 
+## Aggiornamento approvato — 18 ottobre 2026
+
+Marketplace riservato agli utenti autenticati (rivendite approved), homepage ospiti con accesso/registrazione; eliminazione recuperabile articoli owner/admin, gestione foto con moderazione e quantità senza zeri decimali superflui. Questo aggiornamento supera le descrizioni storiche del catalogo pubblico. Contratti e migration in [inventory-access.md](inventory-access.md).
+
 ## Credito retailer spendibile — schema additivo
 
 `retailer_credit_holds`: fonte univoca `order_id` oppure `exchange_version_id`, `retailer_id`, centesimi EUR, flag simulated e stato reserved → spent/released. Owner/importo/fonte/valuta non modificabili; nessun campo balance. Fonte e ownership validate da trigger, storico non eliminabile.

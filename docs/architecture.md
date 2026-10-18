@@ -1,5 +1,9 @@
 # Architettura — audit e marketplace pianificato
 
+## Aggiornamento approvato — 18 ottobre 2026
+
+Marketplace riservato agli utenti autenticati (rivendite approved), homepage ospiti con accesso/registrazione; eliminazione recuperabile articoli owner/admin, gestione foto con moderazione e quantità senza zeri decimali superflui. Questo aggiornamento supera le descrizioni storiche del catalogo pubblico. Contratti e migration in [inventory-access.md](inventory-access.md).
+
 ## EXISTING — adapter Connect e bonus separato
 
 `StripeConnectMarketplaceGateway` implementa contratti marketplace e conguaglio con client/configurazione distinti dal billing. `ReceiveMarketplaceStripeEvent` verifica la firma e normalizza nel dominio stock/ledger esistente. `CustomerPromotionalBonus` registra grant, prenotazione, spesa, release e ripristino in un ledger indipendente dal wallet retailer. `RefundMarketplaceVendor` separa intent PSP e finalizzazione transazionale; `ReconcileMarketplacePayments` gestisce retry e incassi tardivi. Provider disabilitato per default; rilascio credito reale/payout ancora bloccato. Limiti operativi in [marketplace-payments.md](marketplace-payments.md).

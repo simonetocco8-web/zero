@@ -45,7 +45,7 @@ class SaleItem extends Model
 
     public function inventoryItem(): BelongsTo
     {
-        return $this->belongsTo(InventoryItem::class);
+        return $this->belongsTo(InventoryItem::class)->withTrashed();
     }
 
     public function retailer(): BelongsTo

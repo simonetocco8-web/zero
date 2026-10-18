@@ -7,6 +7,12 @@ use App\Models\User;
 
 class UserPolicy
 {
+    public function accessMarketplace(User $user): bool
+    {
+        return in_array($user->role, [UserRole::Admin, UserRole::Customer], true)
+            || ($user->role === UserRole::Retailer && $user->retailer?->status->value === 'approved');
+    }
+
     public function purchase(User $user): bool
     {
         return in_array($user->role, [UserRole::Customer, UserRole::Retailer], true);

@@ -35,7 +35,7 @@ class ProcessStorePublication implements ShouldQueue
         }
         try {
             $item = $publication->inventoryItem;
-            if ($item->retailer->status->value !== 'approved') {
+            if (! $item || $item->trashed() || $item->retailer->status->value !== 'approved') {
                 throw new \RuntimeException('Retailer is not approved.');
             }
             $key = 'inventory-'.$item->id;

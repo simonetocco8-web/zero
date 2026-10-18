@@ -45,7 +45,7 @@ class StockReservations
         }
         $expiry = now()->addMinutes((int) $minutes);
         foreach ($this->lines($order) as $line) {
-            $item = InventoryItem::lockForUpdate()->findOrFail($line->inventory_item_id);
+            $item = InventoryItem::withTrashed()->lockForUpdate()->findOrFail($line->inventory_item_id);
             $key = 'order:'.$order->checkout_key.':item:'.$item->id;
             $existing = StockReservation::where('idempotency_key', $key)->lockForUpdate()->first();
             if ($existing) {
@@ -72,11 +72,11 @@ class StockReservations
     {
         return DB::transaction(function () use ($order, $callback) {
             $lines = $this->lines($order);
-            $retailers = InventoryItem::whereIn('id', $lines->pluck('inventory_item_id'))->orderBy('retailer_id')->pluck('retailer_id')->push($order->user->retailer?->id)->filter()->unique()->sort();
+            $retailers = InventoryItem::withTrashed()->whereIn('id', $lines->pluck('inventory_item_id'))->orderBy('retailer_id')->pluck('retailer_id')->push($order->user->retailer?->id)->filter()->unique()->sort();
             foreach ($retailers as $id) {
                 Retailer::lockForUpdate()->findOrFail($id);
             }
-            $items = InventoryItem::whereIn('id', $lines->pluck('inventory_item_id'))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $items = InventoryItem::withTrashed()->whereIn('id', $lines->pluck('inventory_item_id'))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             $current = Order::lockForUpdate()->findOrFail($order->id);
             $payment = $current->payment()->lockForUpdate()->firstOrFail();
             $reservations = StockReservation::where('order_id', $order->id)->orderBy('inventory_item_id')->lockForUpdate()->get();
@@ -146,9 +146,9 @@ class StockReservations
         StockReservation::where('status', 'active')->where('expires_at', '<=', now())->whereNull('order_id')->whereNull('exchange_id')->orderBy('id')->chunkById(100, function ($rows) use (&$count) {
             foreach ($rows as $row) {
                 DB::transaction(function () use ($row, &$count) {
-                    $product = InventoryItem::findOrFail($row->inventory_item_id);
+                    $product = InventoryItem::withTrashed()->findOrFail($row->inventory_item_id);
                     Retailer::lockForUpdate()->findOrFail($product->retailer_id);
-                    InventoryItem::lockForUpdate()->findOrFail($product->id);
+                    InventoryItem::withTrashed()->lockForUpdate()->findOrFail($product->id);
                     $r = StockReservation::lockForUpdate()->findOrFail($row->id);
                     if ($r->status->value === 'active' && $r->expires_at <= now()) {
                         $r->update(['status' => 'expired', 'released_at' => now()]);

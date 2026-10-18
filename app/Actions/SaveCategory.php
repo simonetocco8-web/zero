@@ -28,7 +28,7 @@ class SaveCategory
         Gate::forUser($actor)->authorize('delete', $category);
         DB::transaction(function () use ($category) {
             $category = Category::lockForUpdate()->findOrFail($category->id);
-            if ($category->inventoryItems()->exists() || InventoryItem::where('proposed_data->category_id', $category->id)->exists()) {
+            if ($category->inventoryItems()->withTrashed()->exists() || InventoryItem::withTrashed()->where('proposed_data->category_id', $category->id)->exists()) {
                 throw ValidationException::withMessages(['category' => 'Categoria utilizzata: disattivala invece di eliminarla.']);
             }
             $category->delete();

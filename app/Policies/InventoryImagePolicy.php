@@ -11,7 +11,7 @@ class InventoryImagePolicy
 {
     public function viewPublic(?User $user, InventoryImage $image): bool
     {
-        return app(PublicInventory::class)->isAvailable($image->inventoryItem);
+        return $user && $user->can('accessMarketplace', User::class) && app(PublicInventory::class)->isAvailable($image->inventoryItem);
     }
 
     public function view(User $user, InventoryImage $inventoryImage): bool

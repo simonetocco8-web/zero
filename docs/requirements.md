@@ -1,5 +1,9 @@
 # Requisiti di ZeroMagazzino
 
+## Aggiornamento approvato — 18 ottobre 2026
+
+Marketplace riservato agli utenti autenticati (rivendite approved), homepage ospiti con accesso/registrazione; eliminazione recuperabile articoli owner/admin, gestione foto con moderazione e quantità senza zeri decimali superflui. Questo aggiornamento supera le descrizioni storiche del catalogo pubblico. Contratti e migration in [inventory-access.md](inventory-access.md).
+
 ## Correzione vincolante credito retailer — 16 ottobre 2026
 
 L'istruzione successiva del committente prevale sul precedente divieto di spesa del PDF: il retailer può spendere credito **già maturato** per acquisti e conguagli, integralmente o insieme alla carta. Il bonus customer rimane separato e non soddisfa questo requisito.

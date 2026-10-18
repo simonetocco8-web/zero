@@ -15,6 +15,7 @@ use App\Http\Controllers\CustomerAreaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExchangeController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryManagementController;
 use App\Http\Controllers\MarketplaceConnectController;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\MarketplaceNotificationController;
@@ -22,18 +23,21 @@ use App\Http\Controllers\MarketplaceOrderController;
 use App\Http\Controllers\RetailerController;
 use App\Http\Controllers\RetailerSalesController;
 use App\Http\Middleware\EnsureApprovedRetailer;
+use App\Http\Middleware\EnsureMarketplaceAccess;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [MarketplaceController::class, 'home'])->name('home');
-Route::get('marketplace', [MarketplaceController::class, 'index'])->name('marketplace.index');
-Route::get('marketplace/categoria/{category:slug}', [MarketplaceController::class, 'index'])->name('marketplace.category');
-Route::get('marketplace/prodotto/{item}', [MarketplaceController::class, 'show'])->whereNumber('item')->name('marketplace.show');
-Route::get('marketplace/prodotto/{item}/immagini/{position}', [MarketplaceController::class, 'image'])->whereNumber('item')->whereNumber('position')->name('marketplace.image');
-Route::get('marketplace/prodotto/{item}/acquista', [MarketplaceController::class, 'purchase'])->middleware(['auth', 'can:purchase,'.User::class])->whereNumber('item')->name('marketplace.purchase');
-Route::get('marketplace/prodotto/{item}/scambio', [MarketplaceController::class, 'exchange'])->middleware('auth')->whereNumber('item')->name('marketplace.exchange');
-Route::get('products/{item}/request', [AvailabilityController::class, 'create'])->name('availability.create');
-Route::post('products/{item}/request', [AvailabilityController::class, 'store'])->middleware('throttle:availability')->name('availability.store');
+Route::middleware(['auth', EnsureMarketplaceAccess::class])->group(function () {
+    Route::get('marketplace', [MarketplaceController::class, 'index'])->name('marketplace.index');
+    Route::get('marketplace/categoria/{category:slug}', [MarketplaceController::class, 'index'])->name('marketplace.category');
+    Route::get('marketplace/prodotto/{item}', [MarketplaceController::class, 'show'])->whereNumber('item')->name('marketplace.show');
+    Route::get('marketplace/prodotto/{item}/immagini/{position}', [MarketplaceController::class, 'image'])->whereNumber('item')->whereNumber('position')->name('marketplace.image');
+    Route::get('marketplace/prodotto/{item}/acquista', [MarketplaceController::class, 'purchase'])->middleware(['auth', 'can:purchase,'.User::class])->whereNumber('item')->name('marketplace.purchase');
+    Route::get('marketplace/prodotto/{item}/scambio', [MarketplaceController::class, 'exchange'])->middleware('auth')->whereNumber('item')->name('marketplace.exchange');
+    Route::get('products/{item}/request', [AvailabilityController::class, 'create'])->name('availability.create');
+    Route::post('products/{item}/request', [AvailabilityController::class, 'store'])->middleware('throttle:availability')->name('availability.store');
+});
 Route::view('privacy', 'availability.privacy')->name('privacy');
 Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('dashboard');
 
@@ -102,6 +106,12 @@ Route::middleware(['auth', 'can:accessAdministration,'.User::class])->prefix('ad
 
 Route::get('inventory/{item}/photos/{position}', [InventoryController::class, 'image'])->middleware('auth')->whereNumber('position')->name('inventory.image');
 
+Route::middleware(['auth', 'throttle:30,1'])->group(function () {
+    Route::delete('inventory/{item}', [InventoryManagementController::class, 'destroy'])->name('inventory.destroy');
+    Route::get('inventory/{item}/photos', [InventoryManagementController::class, 'editPhotos'])->name('inventory.photos.edit');
+    Route::put('inventory/{item}/photos', [InventoryManagementController::class, 'photos'])->name('inventory.photos.update');
+});
+
 if (app()->environment('local')) {
     Route::view('/design-system', 'pages.design-system')->middleware('auth')->name('design-system');
 }
@@ -122,17 +132,19 @@ Route::middleware(['auth', 'can:purchase,'.User::class])->group(function () {
     Route::get('customer/profilo', [CustomerAreaController::class, 'profile'])->name('customer.profile');
     Route::put('customer/profilo', [CustomerAreaController::class, 'updateProfile'])->middleware('throttle:20,1')->name('customer.profile.update');
 
-    Route::get('carrello', [CartController::class, 'index'])->name('cart.index');
-    Route::post('carrello/prodotti/{item}', [CartController::class, 'store'])->middleware('throttle:60,1')->name('cart.store');
-    Route::put('carrello/righe/{cartItem}', [CartController::class, 'update'])->name('cart.update');
-    Route::delete('carrello/righe/{cartItem}', [CartController::class, 'destroy'])->name('cart.destroy');
-    Route::get('checkout', [CheckoutController::class, 'index'])->name('checkout.index');
-    Route::post('checkout/riepilogo', [CheckoutController::class, 'review'])->name('checkout.review');
-    Route::post('checkout/conferma', [CheckoutController::class, 'confirm'])->middleware('throttle:10,1')->name('checkout.confirm');
+    Route::middleware(EnsureMarketplaceAccess::class)->group(function () {
+        Route::get('carrello', [CartController::class, 'index'])->name('cart.index');
+        Route::post('carrello/prodotti/{item}', [CartController::class, 'store'])->middleware('throttle:60,1')->name('cart.store');
+        Route::put('carrello/righe/{cartItem}', [CartController::class, 'update'])->name('cart.update');
+        Route::delete('carrello/righe/{cartItem}', [CartController::class, 'destroy'])->name('cart.destroy');
+        Route::get('checkout', [CheckoutController::class, 'index'])->name('checkout.index');
+        Route::post('checkout/riepilogo', [CheckoutController::class, 'review'])->name('checkout.review');
+        Route::post('checkout/conferma', [CheckoutController::class, 'confirm'])->middleware('throttle:10,1')->name('checkout.confirm');
+    });
     Route::get('ordini', [MarketplaceOrderController::class, 'index'])->name('orders.index');
     Route::get('ordini/{order}', [MarketplaceOrderController::class, 'show'])->name('orders.show');
     Route::post('ordini/{order}/annulla', [MarketplaceOrderController::class, 'cancel'])->middleware('throttle:10,1')->name('orders.cancel');
-    Route::post('ordini/{order}/simulazione', [MarketplaceOrderController::class, 'retry'])->middleware('throttle:10,1')->name('orders.payment-retry');
+    Route::post('ordini/{order}/simulazione', [MarketplaceOrderController::class, 'retry'])->middleware([EnsureMarketplaceAccess::class, 'throttle:10,1'])->name('orders.payment-retry');
 });
 require __DIR__.'/auth.php';
 

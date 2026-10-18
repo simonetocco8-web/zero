@@ -15,7 +15,7 @@ return [
         ['route' => 'retailer.exchanges.index', 'label' => 'Scambi', 'icon' => 'chat', 'requires_retailer' => true, 'pattern' => ['retailer.exchanges.*', 'retailer.differences.*'], 'children' => [
             ['route' => 'retailer.exchanges.index', 'label' => 'Proposte ricevute', 'parameters' => ['tab' => 'received']], ['route' => 'retailer.exchanges.index', 'label' => 'Proposte inviate', 'parameters' => ['tab' => 'sent']], ['route' => 'retailer.differences.index', 'label' => 'Conguagli'],
         ]],
-        ['route' => 'customer.dashboard', 'label' => 'Marketplace', 'icon' => 'grid'],
+        ['route' => 'marketplace.index', 'label' => 'Vai al marketplace', 'icon' => 'grid', 'requires_operate' => true],
         ['route' => 'retailer.profile', 'label' => 'Profilo', 'icon' => 'user'],
     ],
     'admin' => [

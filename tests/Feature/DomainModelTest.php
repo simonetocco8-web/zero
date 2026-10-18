@@ -233,7 +233,7 @@ class DomainModelTest extends TestCase
     {
         $line = SaleItem::factory()->create();
         $this->expectException(QueryException::class);
-        $line->inventoryItem->delete();
+        $line->inventoryItem->forceDelete();
     }
 
     public function test_inventory_image_positions_are_unique(): void

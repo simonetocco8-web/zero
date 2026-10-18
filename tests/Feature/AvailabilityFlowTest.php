@@ -20,6 +20,7 @@ class AvailabilityFlowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->actingAs(User::factory()->create(['role' => 'customer']));
         $this->retailer = Retailer::factory()->approved()->create();
         $this->item = InventoryItem::factory()->published()->create(['retailer_id' => $this->retailer->id]);
     }
@@ -126,6 +127,7 @@ class AvailabilityFlowTest extends TestCase
     public function test_guests_pending_retailers_and_admin_cannot_change_status(): void
     {
         $record = AvailabilityRequest::factory()->create(['retailer_id' => $this->retailer->id, 'inventory_item_id' => $this->item->id]);
+        auth()->logout();
         $this->patch(route('retailer.requests.update', $record), ['status' => 'closed'])->assertRedirect(route('login'));
         $this->retailer->update(['status' => 'pending']);
         $this->actingAs($this->retailer->user)->patch(route('retailer.requests.update', $record), ['status' => 'closed'])->assertForbidden();

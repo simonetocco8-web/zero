@@ -1,5 +1,9 @@
 # Integrazioni — billing, marketplace e store opzionale
 
+## Aggiornamento approvato — 18 ottobre 2026
+
+Marketplace riservato agli utenti autenticati (rivendite approved), homepage ospiti con accesso/registrazione; eliminazione recuperabile articoli owner/admin, gestione foto con moderazione e quantità senza zeri decimali superflui. Questo aggiornamento supera le descrizioni storiche del catalogo pubblico. Contratti e migration in [inventory-access.md](inventory-access.md).
+
 ## EXISTING — marketplace Connect distinto dal billing PRO
 
 Adapter `StripeConnectMarketplaceGateway` con client e variabili `MARKETPLACE_STRIPE_*` dedicati. Webhook firmato `/webhooks/marketplace/stripe`, receipt SQL, nessuna conferma da redirect. Non usa `StripeBillingGateway` o le variabili `STRIPE_*` PRO. Chiavi outbound opache proxy supportate tramite modalità esplicita test/live; il signing secret HMAC deve essere disponibile localmente al server, non un placeholder destinato alla sostituzione su richieste outbound. Il runtime di sviluppo non ha credenziali marketplace configurate; requisiti e `api.stripe.com` salvati nella bozza ambiente da rivedere/pubblicare, non applicati automaticamente. Dettagli e blocchi al lancio in [marketplace-payments.md](marketplace-payments.md).

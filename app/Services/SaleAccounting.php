@@ -43,7 +43,7 @@ class SaleAccounting
             $sale = Sale::create(['provider' => $data['provider'], 'external_order_id' => $data['external_order_id'], 'status' => 'paid', 'currency' => 'EUR', 'total_cents' => 0, 'ordered_at' => $data['timestamp'], 'paid_at' => $data['timestamp']]);
             $total = BigInteger::zero();
             foreach ($data['items'] as $line) {
-                $product = InventoryItem::whereKey($line['inventory_item_id'])->where('retailer_id', $line['retailer_id'])->lockForUpdate()->first();
+                $product = InventoryItem::withTrashed()->whereKey($line['inventory_item_id'])->where('retailer_id', $line['retailer_id'])->lockForUpdate()->first();
                 if (! $product || $product->currency !== 'EUR') {
                     $this->invalid('items', 'Prodotto e rivenditore non corrispondono, oppure valuta non supportata.');
                 }

@@ -13,7 +13,7 @@ class InventoryItemPolicy
 {
     public function viewPublic(?User $user, InventoryItem $item): bool
     {
-        return app(PublicInventory::class)->isAvailable($item);
+        return $user && $user->can('accessMarketplace', User::class) && app(PublicInventory::class)->isAvailable($item);
     }
 
     public function create(User $user): bool
@@ -29,6 +29,16 @@ class InventoryItemPolicy
     public function archive(User $user, InventoryItem $inventoryItem): bool
     {
         return $this->update($user, $inventoryItem) && in_array($inventoryItem->status->value, ['draft', 'pending', 'rejected']) && ! $inventoryItem->published_at && ! $inventoryItem->external_product_id;
+    }
+
+    public function delete(User $user, InventoryItem $item): bool
+    {
+        return $user->role === UserRole::Admin || ($this->create($user) && $item->retailer_id === $user->retailer->id);
+    }
+
+    public function managePhotos(User $user, InventoryItem $item): bool
+    {
+        return $user->role === UserRole::Admin || $this->update($user, $item);
     }
 
     public function review(User $user, InventoryItem $inventoryItem): bool
