@@ -103,7 +103,7 @@ class ExchangeWorkflow
     private function products(array $ids, array $owners, $retailers)
     {
         // Never acquire a third party's stock locks for a forged proposal.
-        $items = InventoryItem::whereIn('id', $ids)->whereIn('retailer_id', $owners)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $items = InventoryItem::withTrashed()->whereIn('id', $ids)->whereIn('retailer_id', $owners)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
         if ($items->count() !== count(array_unique($ids))) {
             $this->rules->fail('lines', 'Prodotti non appartenenti ai partecipanti.');
         }

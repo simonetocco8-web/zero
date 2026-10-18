@@ -1,0 +1,3 @@
+<x-marketplace-layout title="Accedi o registrati" robots="noindex,nofollow" :canonical="route('home')">
+    <section class="mx-auto max-w-xl py-12 text-center"><h1>Benvenuto in ZeroMagazzino</h1><p class="my-6">Accedi o registrati per consultare il marketplace. Le rivendite possono accedere dopo l’approvazione dell’account.</p><div class="flex flex-wrap justify-center gap-4"><x-button :href="route('login')">Accedi</x-button><x-button variant="secondary" :href="route('register')">Registrati come rivenditore</x-button><x-button variant="secondary" :href="route('customer.register')">Registrati come cliente</x-button></div></section>
+</x-marketplace-layout>

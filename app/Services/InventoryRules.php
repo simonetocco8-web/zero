@@ -72,11 +72,11 @@ class InventoryRules
             $this->fail('exchange_available', 'Lo scambio richiede un piano PRO attivo.');
         }
         // Current locking read: MySQL REPEATABLE READ snapshots may predate the retailer lock.
-        $allItems = $retailer->inventoryItems()->lockForUpdate()->get();
+        $allItems = $retailer->inventoryItems()->withTrashed()->lockForUpdate()->get();
         if (! empty($data['sku']) && $allItems->contains(fn ($item) => $item->id !== $target?->id && $item->sku === $data['sku'])) {
             $this->fail('sku', 'Il codice è già usato da un’altra giacenza.');
         }
-        $items = $allItems->filter(fn ($item) => $item->status->value !== 'archived');
+        $items = $allItems->filter(fn ($item) => ! $item->trashed() && $item->status->value !== 'archived');
         if (! $target && $plan->max_items !== null && $items->count() >= $plan->max_items) {
             $this->fail('plan', 'Hai raggiunto il limite di '.$plan->max_items.' articoli.');
         }

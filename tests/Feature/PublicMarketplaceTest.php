@@ -20,6 +20,12 @@ class PublicMarketplaceTest extends TestCase
 {
     use AdditiveRefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAs(User::factory()->create(['role' => 'customer']));
+    }
+
     private function product(array $data = []): InventoryItem
     {
         $r = Retailer::factory()->approved()->create();
@@ -44,7 +50,7 @@ class PublicMarketplaceTest extends TestCase
         foreach ([route('home'), route('marketplace.index'), route('marketplace.category', $i->categoryRecord->slug), route('marketplace.show', $i)] as $url) {
             $this->get($url)->assertOk()->assertSee('Piastrella approved')->assertDontSee('Nome segreto proposta')->assertDontSee('Brand segreto')->assertDontSee('Segreto proposta');
         }
-        $this->get(route('home'))->assertSee('In evidenza')->assertSee('Diventa rivenditore')->assertSee('Accedi');
+        $this->get(route('home'))->assertSee('In evidenza')->assertSee('Diventa rivenditore')->assertSee('La tua area');
         $this->get(route('marketplace.index', ['q' => 'Nome segreto proposta']))->assertDontSee('Piastrella approved');
     }
 
@@ -123,7 +129,7 @@ class PublicMarketplaceTest extends TestCase
     {
         $i = $this->product(['shipping_available' => true, 'shipping_cost_cents' => 1234, 'delivery_notes' => 'Consegna dal lunedì', 'vat_treatment' => 'excluded', 'unit' => 'm2', 'quantity' => '1.250']);
         $i->retailer->update(['iban' => 'private-iban', 'contact_email' => 'private-retailer@example.com']);
-        $this->get(route('marketplace.show', $i))->assertOk()->assertSee($i->name)->assertSee('Descrizione approvata')->assertSee('IVA esclusa')->assertSee('12,34')->assertSee('1.250 m2')->assertSee('Consegna dal lunedì')->assertSee('SKU-PUBBLICO')->assertSee('8021234567890')->assertSee('Acquista')->assertSee('Richiedi informazioni')->assertDontSee('private-iban')->assertDontSee('private-retailer@example.com')->assertSee('rel="canonical"', false)->assertSee('property="og:title"', false)->assertSee('name="description"', false);
+        $this->get(route('marketplace.show', $i))->assertOk()->assertSee($i->name)->assertSee('Descrizione approvata')->assertSee('IVA esclusa')->assertSee('12,34')->assertSee('1,25 m2')->assertSee('Consegna dal lunedì')->assertSee('SKU-PUBBLICO')->assertSee('8021234567890')->assertSee('Acquista')->assertSee('Richiedi informazioni')->assertDontSee('private-iban')->assertDontSee('private-retailer@example.com')->assertSee('rel="canonical"', false)->assertSee('property="og:title"', false)->assertSee('name="description"', false);
         $url = route('marketplace.show', $i);
         $i->update(['name' => 'Nome modificato']);
         $this->assertSame($url, route('marketplace.show', $i));
@@ -159,6 +165,7 @@ class PublicMarketplaceTest extends TestCase
         $this->get(route('marketplace.image', [$i, 0]))->assertNotFound();
         $i->images()->first()->update(['path' => '../private/secret']);
         $this->get(route('marketplace.image', [$i, 0]))->assertNotFound();
+        auth()->logout();
         $this->get(route('inventory.image', [$i, 0]))->assertRedirect(route('login'));
     }
 
@@ -187,6 +194,7 @@ class PublicMarketplaceTest extends TestCase
     public function test_purchase_entry_has_no_financial_effects_and_admin_is_excluded(): void
     {
         $i = $this->product();
+        auth()->logout();
         $this->get(route('marketplace.purchase', $i))->assertRedirect(route('login'));
         $this->actingAs(User::factory()->create(['role' => 'customer']))->get(route('marketplace.purchase', $i))->assertOk()->assertSee('Aggiungi al carrello');
         $this->assertDatabaseCount('sales', 0);

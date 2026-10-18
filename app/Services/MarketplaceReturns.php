@@ -77,7 +77,7 @@ class MarketplaceReturns
             if ($quantity <= 0) {
                 continue;
             }
-            $item = InventoryItem::lockForUpdate()->findOrFail($line->inventory_item_id);
+            $item = InventoryItem::withTrashed()->lockForUpdate()->findOrFail($line->inventory_item_id);
             $updated = BigInteger::of($item->quantity_milliunits)->plus($quantity)->toInt();
             DB::table('inventory_items')->where('id', $item->id)->update(['quantity_milliunits' => $updated, 'stock_version' => DB::raw('stock_version + 1'), 'updated_at' => now()]);
             MarketplaceStockReturn::create(['marketplace_return_case_id' => $case->id, 'order_item_id' => $line->id, 'quantity_milliunits' => $quantity]);

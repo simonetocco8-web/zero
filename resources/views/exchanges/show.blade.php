@@ -59,7 +59,7 @@
                             <h4 class="font-semibold break-words">Lato {{ strtoupper($side) }} · {{ $v->parties_snapshot[$side]['name'] }}</h4>
                             <ul class="mt-3 space-y-3">
                                 @foreach($v->lines->where('side',$side) as $line)
-                                    <li class="rounded-xl bg-slate-50 p-3"><strong class="break-words">{{ $line->product_snapshot['name'] }}</strong><p>SKU: {{ $line->product_snapshot['sku'] ?: '—' }}</p><p>{{ (string)\Brick\Math\BigDecimal::of($line->quantity_milliunits)->dividedBy(1000,3) }} {{ $line->product_snapshot['unit'] }} × {{ \App\Support\DisplayMoney::euros($line->agreed_unit_value_cents) }} = {{ \App\Support\DisplayMoney::euros($line->goods_value_cents) }}</p><p>{{ config('marketplace.vat_treatments.'.$line->product_snapshot['vat_treatment']) ?? 'IVA da definire' }}</p></li>
+                                    <li class="rounded-xl bg-slate-50 p-3"><strong class="break-words">{{ $line->product_snapshot['name'] }}</strong><p>SKU: {{ $line->product_snapshot['sku'] ?: '—' }}</p><p>{{ \App\Support\DisplayQuantity::format($line->quantity_milliunits) }} {{ $line->product_snapshot['unit'] }} × {{ \App\Support\DisplayMoney::euros($line->agreed_unit_value_cents) }} = {{ \App\Support\DisplayMoney::euros($line->goods_value_cents) }}</p><p>{{ config('marketplace.vat_treatments.'.$line->product_snapshot['vat_treatment']) ?? 'IVA da definire' }}</p></li>
                                 @endforeach
                             </ul>
                             @php($d=$side==='a'?$v->delivery_a:$v->delivery_b)

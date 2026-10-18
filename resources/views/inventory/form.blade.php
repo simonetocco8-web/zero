@@ -1,6 +1,6 @@
 @php
 $editing=$item->exists; $title=$editing ? 'Modifica giacenza':'Metti in vendita';
-$quantity=isset($data['quantity_milliunits']) ? (string)\Brick\Math\BigDecimal::of($data['quantity_milliunits'])->dividedBy(1000,3):'';
+$quantity=isset($data['quantity_milliunits']) ? \App\Support\DisplayQuantity::input($data['quantity_milliunits']):'';
 $price=fn($key)=>isset($data[$key]) ? (string)\Brick\Math\BigDecimal::of($data[$key])->dividedBy(100,2):'';
 @endphp
 <x-layouts.retailer :title="$title"><h1 class="mb-5">{{ $title }}</h1>
@@ -19,6 +19,7 @@ $price=fn($key)=>isset($data[$key]) ? (string)\Brick\Math\BigDecimal::of($data[$
 <div x-data="{ gallery: [], camera: [], get previews() { return [...this.gallery,...this.camera]; }, preview(files, source) { this[source].forEach(url => URL.revokeObjectURL(url)); this[source] = Array.from(files).map(file => URL.createObjectURL(file)); } }">
 <label class="field-label" for="photos">Foto da galleria o dispositivo</label><input id="photos" type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple @change="preview($event.target.files, 'gallery')" class="block w-full min-w-0 text-sm" aria-invalid="{{ $errors->has('photos') || $errors->has('photos.*') ? 'true' : 'false' }}" aria-describedby="photo-help photo-errors">
 <label class="mt-3 flex min-h-11 items-center gap-2" for="camera">Oppure scatta una foto</label><input id="camera" type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" capture="environment" @change="preview($event.target.files, 'camera')" class="block w-full min-w-0 text-sm" aria-invalid="{{ $errors->has('photos') || $errors->has('photos.*') ? 'true' : 'false' }}" aria-describedby="photo-help photo-errors">
+@if($editing)<x-button variant="secondary" :href="route('inventory.photos.edit',$item)">Gestisci foto esistenti: elimina o sostituisci</x-button>@endif
 <p id="photo-help" class="mt-2 text-sm text-slate-600">JPG, PNG o WebP; massimo 15 MB per foto e {{ config('inventory.max_photos') }} foto. Nuove foto sostituiscono l’intero gruppo precedente; senza nuovi file le foto restano invariate.</p>
 <div class="mt-3 grid grid-cols-3 gap-2"><template x-for="url in previews" :key="url"><img :src="url" alt="Anteprima foto selezionata" class="aspect-square w-full rounded-xl object-cover"></template></div></div>
 <div id="photo-errors">@error('photos')<p id="photos-error" class="mt-2 text-sm text-red-700">{{ $message }}</p>@enderror

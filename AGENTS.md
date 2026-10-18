@@ -1,5 +1,7 @@
 # Regole permanenti — ZeroMagazzino
 
+- DECISIONE ACCESSO 18/10/2026: marketplace riservato, homepage guest solo ingresso/registrazione. Customer/admin autenticati; rivendite approved. Articoli eliminabili da owner/admin con soft delete, storico preservato e blocco reservation attive. Foto gestibili singolarmente, moderazione versione pubblicata conservata. Quantità UI italiane senza zeri superflui; dati millesimi invariati. Vedere docs/inventory-access.md; prevale sui riferimenti storici al marketplace pubblico.
+
 - DECISIONE CORRENTE: correzione vincolante utente 16/10/2026 (credito retailer spendibile e checkout 30m), poi PDF pagamenti v1.0 del 14/10/2026 ricevuto il 16/10. Stripe Connect separate charges and transfers, vendite FREE/PRO 200/50 bp, conguaglio 50 bp al ricevente. Checkout 30m, conguaglio 1440m, proposta 48h. Credito retailer maturato spendibile su acquisti e conguagli, anche insieme alla carta (correzione vincolante del committente del 16/10, prevale sul PDF per questi punti); bonus customer separato 12 mesi/max10% merce. Questa decisione e docs/marketplace-payments.md prevalgono sui riferimenti storici sotto. Implementazione provider autorizzata dalla richiesta utente, attivazione live subordinata a verifica Stripe/fiscale. Nessun incasso reale durante sviluppo; fixture fake solo nei test.
 
 ## Perimetro e stack

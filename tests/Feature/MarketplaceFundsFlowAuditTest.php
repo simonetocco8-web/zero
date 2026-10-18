@@ -35,6 +35,22 @@ class MarketplaceFundsFlowAuditTest extends TestCase
 {
     use AdditiveRefreshDatabase;
 
+    public function test_deleted_inventory_keeps_order_snapshot_and_can_be_restocked_on_refund(): void
+    {
+        $r = $this->seller();
+        $p = $this->product($r);
+        $order = $this->order([$p], true);
+        $vendor = $order->vendorOrders()->sole();
+        $this->actingAs($r->user)->delete(route('inventory.destroy', $p))->assertRedirect();
+        $this->assertSoftDeleted('inventory_items', ['id' => $p->id]);
+        $this->assertSame($p->name, $vendor->items()->sole()->name);
+        $admin = User::factory()->create(['role' => 'admin']);
+        app(VendorOrderWorkflow::class)->refund($admin, $vendor, 'Annullamento prima della consegna');
+        $this->assertSame('refunded', $vendor->fresh()->status->value);
+        $this->assertSame(10000, InventoryItem::withTrashed()->findOrFail($p->id)->quantity_milliunits);
+        $this->assertNull(InventoryItem::find($p->id));
+    }
+
     private function seller(string $plan = 'pro'): Retailer
     {
         $this->seed(PlanSeeder::class);

@@ -1,5 +1,5 @@
-@props(['title','description'=>null,'canonical'=>null,'image'=>null,'robots'=>'index,follow'])
-<!DOCTYPE html><html lang="it"><head><x-head :title="$title" :description="$description" :canonical="$canonical" :image="$image" :robots="$robots" /></head><body>
+@props(['title','description'=>null,'canonical'=>null,'image'=>null,'robots'=>'noindex,nofollow'])
+<!DOCTYPE html><html lang="it"><head><x-head :title="$title" :description="$description" :canonical="$canonical" :image="$image" robots="noindex,nofollow" /></head><body>
 <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:bg-white focus:p-3">Vai al contenuto</a>
 <header class="border-b border-slate-200 bg-white"><div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6"><a href="{{ route('home') }}" class="inline-flex min-h-11 items-center"><x-brand /></a><nav aria-label="Navigazione principale" class="flex flex-wrap items-center gap-2"><a class="btn btn-secondary" href="{{ route('marketplace.index') }}">Marketplace</a>@auth @can('purchase',\App\Models\User::class)<a class="btn btn-secondary" href="{{ route('cart.index') }}">Carrello</a><a class="btn btn-secondary" href="{{ route('orders.index') }}">Ordini</a>@endcan<a class="btn btn-primary" href="{{ route('dashboard') }}">La tua area</a>@else<a class="btn btn-primary" href="{{ route('login') }}">Accedi</a>@endauth</nav></div></header>
 <main id="main-content" tabindex="-1" class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">{{ $slot }}</main>

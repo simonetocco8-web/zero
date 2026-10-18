@@ -15,7 +15,7 @@
                 @foreach($vendor->items as $line)
                     <div class="mt-4">
                         <strong>{{ $line->name }}</strong>
-                        <p>SKU: {{ $line->sku ?: '—' }} · {{ (string)\Brick\Math\BigDecimal::of($line->quantity_milliunits)->dividedBy(1000,3) }} {{ $line->unit }} × {{ \App\Support\DisplayMoney::euros($line->unit_price_cents) }}</p>
+                        <p>SKU: {{ $line->sku ?: '—' }} · {{ \App\Support\DisplayQuantity::format($line->quantity_milliunits) }} {{ $line->unit }} × {{ \App\Support\DisplayMoney::euros($line->unit_price_cents) }}</p>
                         <p>{{ $line->tax_snapshot['description'] }}</p>
                     </div>
                 @endforeach

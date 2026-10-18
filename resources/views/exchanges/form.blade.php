@@ -24,13 +24,13 @@
                                 $oldLines=collect(old('lines.'.$side,[]));
                                 $oldLine=$oldLines->firstWhere('inventory_item_id',(string)$product->id);
                                 $selected=$errors->any() ? $oldLine!==null : ($existing!==null || (!$exchange && $side==='b' && $product->id===$requested->id));
-                                $quantity=$oldLine['quantity'] ?? ($existing ? (string)\Brick\Math\BigDecimal::of($existing->quantity_milliunits)->dividedBy(1000,3) : (string)\Brick\Math\BigDecimal::of(min(1000,$product->available_quantity_milliunits))->dividedBy(1000,3));
+                                $quantity=$oldLine['quantity'] ?? ($existing ? \App\Support\DisplayQuantity::format($existing->quantity_milliunits) : \App\Support\DisplayQuantity::input(min(1000,$product->available_quantity_milliunits)));
                                 $value=$oldLine['value'] ?? (string)\Brick\Math\BigDecimal::of($existing?->agreed_unit_value_cents ?? $product->zero_price_cents)->dividedBy(100,2);
                                 $prefix='lines['.$side.']['.$product->id.']';
                             @endphp
                             <div class="rounded-xl border border-slate-200 p-4" x-data="{selected: @js($selected)}">
                                 <label class="flex min-h-11 items-center gap-3 break-words"><input type="checkbox" name="{{ $prefix }}[selected]" value="1" x-model="selected" @checked($selected)> {{ $product->name }} · {{ $product->sku ?: 'senza SKU' }}</label>
-                                <p class="mt-2 text-sm text-slate-600">Disponibile ora: {{ $product->available_quantity }} {{ $product->unit }}. {{ $product->vatLabel() }}</p>
+                                <p class="mt-2 text-sm text-slate-600">Disponibile ora: {{ \App\Support\DisplayQuantity::format($product->available_quantity_milliunits) }} {{ $product->unit }}. {{ $product->vatLabel() }}</p>
                                 <input type="hidden" name="{{ $prefix }}[inventory_item_id]" value="{{ $product->id }}" :disabled="!selected">
                                 <div class="mt-3 grid gap-3 sm:grid-cols-2">
                                     <label class="block"><span class="field-label">Quantità · {{ $product->unit }}</span><input class="field" name="{{ $prefix }}[quantity]" inputmode="decimal" value="{{ $quantity }}" :disabled="!selected" :required="selected"></label>

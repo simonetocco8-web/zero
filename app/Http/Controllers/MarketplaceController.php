@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\MarketplaceRequest;
 use App\Models\Category;
 use App\Models\InventoryItem;
+use App\Models\User;
 use App\Services\InventoryPhotos;
 use App\Services\MarketplaceCatalog;
 use App\Services\PublicInventory;
@@ -16,6 +17,13 @@ class MarketplaceController extends Controller
 {
     public function home(MarketplaceCatalog $catalog)
     {
+        if (! auth()->check()) {
+            return view('marketplace.welcome');
+        }
+        if (! auth()->user()->can('accessMarketplace', User::class)) {
+            return to_route('dashboard');
+        }
+
         return view('marketplace.home', ['categories' => $catalog->categories(), 'items' => $catalog->query()->limit(8)->get(), 'featured' => config('marketplace.featured_item_ids') ? $catalog->query()->whereIn('id', config('marketplace.featured_item_ids'))->limit(8)->get() : collect()]);
     }
 

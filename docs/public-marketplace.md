@@ -1,5 +1,9 @@
 # Marketplace pubblico — 13 ottobre 2026
 
+## Aggiornamento approvato — 18 ottobre 2026
+
+Marketplace riservato agli utenti autenticati (rivendite approved), homepage ospiti con accesso/registrazione; eliminazione recuperabile articoli owner/admin, gestione foto con moderazione e quantità senza zeri decimali superflui. Questo aggiornamento supera le descrizioni storiche del catalogo pubblico. Contratti e migration in [inventory-access.md](inventory-access.md).
+
 ## EXISTING — proposta di scambio operativa
 
 Il pulsante Proponi uno scambio apre ora il form versionato PRO: non è più un placeholder. Richiede prodotto published/scambiabile con disponibilità, entrambe le parti PRO attive e approved, ed esclude il proprietario. change_pending resta visibile per gli acquisti ma non selezionabile negli scambi. Quantità pubbliche includono anche le prenotazioni exchange. Dettagli in [exchanges.md](exchanges.md); le descrizioni di placeholder nelle sezioni storiche sono superate.

@@ -36,7 +36,10 @@ class SmokeTest extends TestCase
         $this->actingAs($retailer->user);
         $this->get(route('dashboard'))->assertRedirect(route('retailer.dashboard'));
         foreach (config('navigation.retailer') as $link) {
-            $this->get(route($link['route']))->assertOk()->assertSee($link['label']);
+            $response = $this->get(route($link['route']))->assertOk();
+            if ($link['route'] !== 'marketplace.index') {
+                $response->assertSee($link['label']);
+            }
         }
     }
 
@@ -45,7 +48,10 @@ class SmokeTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => UserRole::Admin]));
         $this->get(route('dashboard'))->assertRedirect(route('admin.dashboard'));
         foreach (config('navigation.admin') as $link) {
-            $this->get(route($link['route']))->assertOk()->assertSee($link['label']);
+            $response = $this->get(route($link['route']))->assertOk();
+            if ($link['route'] !== 'marketplace.index') {
+                $response->assertSee($link['label']);
+            }
         }
     }
 
@@ -53,7 +59,11 @@ class SmokeTest extends TestCase
     {
         $this->actingAs(User::factory()->create());
         foreach (config('navigation.admin') as $link) {
-            $this->get(route($link['route']))->assertForbidden();
+            if ($link['route'] === 'marketplace.index') {
+                $this->get(route($link['route']))->assertOk();
+            } else {
+                $this->get(route($link['route']))->assertForbidden();
+            }
         }
     }
 
@@ -61,7 +71,11 @@ class SmokeTest extends TestCase
     {
         $this->actingAs(User::factory()->create(['role' => UserRole::Admin]));
         foreach (config('navigation.retailer') as $link) {
-            $this->get(route($link['route']))->assertForbidden();
+            if ($link['route'] === 'marketplace.index') {
+                $this->get(route($link['route']))->assertOk();
+            } else {
+                $this->get(route($link['route']))->assertForbidden();
+            }
         }
     }
 

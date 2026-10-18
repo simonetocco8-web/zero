@@ -67,7 +67,7 @@ class StockReservationTest extends TestCase
         $this->assertSame(1000, $p->fresh()->quantity_milliunits);
         $this->assertSame(0, $p->fresh()->available_quantity_milliunits);
         $this->assertSame(0, app(MarketplaceCatalog::class)->query()->find($p->id)->available_quantity_milliunits);
-        $this->get(route('marketplace.show', $p))->assertOk()->assertSee('0.000')->assertSee('Quantità attualmente esaurita');
+        $this->actingAs(User::findOrFail($order->user_id))->get(route('marketplace.show', $p))->assertOk()->assertSee('>0 '.$p->unit.'<', false)->assertSee('Quantità attualmente esaurita');
         $this->expectException(ValidationException::class);
         app(MarketplaceCart::class)->save(User::factory()->create(['role' => 'customer']), $p, '1', 'pickup');
     }

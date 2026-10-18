@@ -22,6 +22,6 @@ class CartItem extends Model
 
     public function product(): BelongsTo
     {
-        return $this->belongsTo(InventoryItem::class, 'inventory_item_id');
+        return $this->belongsTo(InventoryItem::class, 'inventory_item_id')->withTrashed();
     }
 }

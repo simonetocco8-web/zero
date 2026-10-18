@@ -14,7 +14,7 @@ class PublicInventory
 
     public function isAvailable(InventoryItem $item): bool
     {
-        return in_array($item->status->value, ['published', 'change_pending'], true) && $item->published_at !== null && $item->retailer->status->value === 'approved';
+        return ! $item->trashed() && in_array($item->status->value, ['published', 'change_pending'], true) && $item->published_at !== null && $item->retailer->status->value === 'approved';
     }
 
     public function ensureAvailable(InventoryItem $item): void

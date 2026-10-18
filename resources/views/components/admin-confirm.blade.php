@@ -1,9 +1,9 @@
-@props(['name', 'label', 'url', 'decision' => null, 'variant' => 'primary', 'reason' => false, 'reference' => false])
+@props(['name', 'label', 'url', 'decision' => null, 'variant' => 'primary', 'reason' => false, 'reference' => false, 'method' => 'PATCH'])
 @php($hasErrors = old('confirmation_id') === $name && $errors->any())
 <x-button type="button" :variant="$variant" x-data x-on:click="$dispatch('open-modal', '{{ $name }}')">{{ $label }}</x-button>
 <x-modal :name="$name" :title="$label" :show="$hasErrors">
 <form method="POST" action="{{ $url }}" class="space-y-4">
-@csrf @method('PATCH')
+@csrf @method($method)
 <input type="hidden" name="confirmation_id" value="{{ $name }}">
 @if($decision)<input type="hidden" name="decision" value="{{ $decision }}">@endif
 <p>Confermi questa operazione?</p>
