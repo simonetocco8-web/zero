@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class InventoryItem extends Model
 {
     use HasExactQuantity;
+
     /** @use HasFactory<InventoryItemFactory> */
     use HasFactory;
 
