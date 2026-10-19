@@ -8,6 +8,6 @@
 @endforeach @endif
 @endforeach
 @if($paginator->hasMorePages())<a class="btn btn-secondary" href="{{ $paginator->nextPageUrl() }}" rel="next">Successiva</a>@else<span class="btn btn-secondary" aria-disabled="true">Successiva</span>@endif
-<p class="w-full text-sm text-slate-600">Pagina {{ $paginator->currentPage() }} di {{ $paginator->lastPage() }}</p>
+<p class="w-full text-sm text-muted">Pagina {{ $paginator->currentPage() }} di {{ $paginator->lastPage() }}</p>
 </nav>
 @endif
