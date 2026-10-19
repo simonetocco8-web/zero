@@ -14,7 +14,7 @@
             @php($payee=$payer==='a'?'b':'a')
             <p class="mt-3 font-semibold break-words">{{ $version->parties_snapshot[$payer]['name'] }} paga {{ \App\Support\DisplayMoney::euros($version->difference_cents) }} a {{ $version->parties_snapshot[$payee]['name'] }}.</p>
         @endif
-        <p class="mt-3 text-sm text-slate-600">Il conguaglio considera i debiti reciproci concordati. Le due cessioni, i trasporti e la commissione restano distinti; il trasporto pagato al vettore resta esterno al conguaglio.</p>
+        <p class="mt-3 text-sm text-muted">Il conguaglio considera i debiti reciproci concordati. Le due cessioni, i trasporti e la commissione restano distinti; il trasporto pagato al vettore resta esterno al conguaglio.</p>
         @if($version->payment_provisional)<p class="mt-3 font-semibold">IVA da definire: conguaglio provvisorio, nessun incasso simulato. Un conguaglio zero provvisorio richiede una nuova versione con importi definiti.</p>@endif
         <p class="mt-3">Accettazioni della versione corrente: {{ $version->acceptances->count() }} / 2</p>
         <ul class="mt-2 space-y-2">@foreach(['a','b'] as $side)<li class="break-words">{{ $version->parties_snapshot[$side]['name'] }}: {{ $version->acceptances->contains('retailer_id',$version->parties_snapshot[$side]['id']) ? 'Accettato' : 'Da accettare' }}</li>@endforeach</ul>
@@ -59,7 +59,7 @@
                             <h4 class="font-semibold break-words">Lato {{ strtoupper($side) }} · {{ $v->parties_snapshot[$side]['name'] }}</h4>
                             <ul class="mt-3 space-y-3">
                                 @foreach($v->lines->where('side',$side) as $line)
-                                    <li class="rounded-xl bg-slate-50 p-3"><strong class="break-words">{{ $line->product_snapshot['name'] }}</strong><p>SKU: {{ $line->product_snapshot['sku'] ?: '—' }}</p><p>{{ \App\Support\DisplayQuantity::format($line->quantity_milliunits) }} {{ $line->product_snapshot['unit'] }} × {{ \App\Support\DisplayMoney::euros($line->agreed_unit_value_cents) }} = {{ \App\Support\DisplayMoney::euros($line->goods_value_cents) }}</p><p>{{ config('marketplace.vat_treatments.'.$line->product_snapshot['vat_treatment']) ?? 'IVA da definire' }}</p></li>
+                                    <li class="rounded-xl bg-canvas p-3"><strong class="break-words">{{ $line->product_snapshot['name'] }}</strong><p>SKU: {{ $line->product_snapshot['sku'] ?: '—' }}</p><p>{{ \App\Support\DisplayQuantity::format($line->quantity_milliunits) }} {{ $line->product_snapshot['unit'] }} × {{ \App\Support\DisplayMoney::euros($line->agreed_unit_value_cents) }} = {{ \App\Support\DisplayMoney::euros($line->goods_value_cents) }}</p><p>{{ config('marketplace.vat_treatments.'.$line->product_snapshot['vat_treatment']) ?? 'IVA da definire' }}</p></li>
                                 @endforeach
                             </ul>
                             @php($d=$side==='a'?$v->delivery_a:$v->delivery_b)
@@ -84,7 +84,7 @@
     <h2 class="mt-8">Timeline</h2>
     <ol class="my-5 space-y-3">
         @foreach($exchange->events as $event)
-            <li class="rounded-xl border border-slate-200 bg-white p-4">{{ $event->created_at->format('d/m/Y H:i') }} · {{ match($event->action){'proposed'=>'Proposta inviata','countered'=>'Nuova controproposta','accepted_by'=>'Accettazione registrata','accepted'=>'Doppia accettazione','awaiting_difference_payment'=>'Conguaglio in attesa','confirmed'=>'Scambio confermato','rejected'=>'Scambio rifiutato','cancelled'=>'Scambio annullato','expired'=>'Scambio scaduto','difference_paid'=>'Conguaglio simulato riuscito','difference_failed'=>'Conguaglio simulato fallito','difference_cancelled'=>'Conguaglio annullato','received'=>'Ricezione merci confermata','completed'=>'Scambio completato','eligibility_lost'=>'Requisiti PRO non più validi',default=>'Evento registrato'} }} · versione {{ $exchange->versions->firstWhere('id',$event->exchange_version_id)?->number }} · {{ $event->user_id===null ? 'Sistema' : ($event->user_id===$exchange->retailerA->user_id ? $exchange->retailerA->company_name : $exchange->retailerB->company_name) }}</li>
+            <li class="rounded-xl border border-line bg-surface p-4">{{ $event->created_at->format('d/m/Y H:i') }} · {{ match($event->action){'proposed'=>'Proposta inviata','countered'=>'Nuova controproposta','accepted_by'=>'Accettazione registrata','accepted'=>'Doppia accettazione','awaiting_difference_payment'=>'Conguaglio in attesa','confirmed'=>'Scambio confermato','rejected'=>'Scambio rifiutato','cancelled'=>'Scambio annullato','expired'=>'Scambio scaduto','difference_paid'=>'Conguaglio simulato riuscito','difference_failed'=>'Conguaglio simulato fallito','difference_cancelled'=>'Conguaglio annullato','received'=>'Ricezione merci confermata','completed'=>'Scambio completato','eligibility_lost'=>'Requisiti PRO non più validi',default=>'Evento registrato'} }} · versione {{ $exchange->versions->firstWhere('id',$event->exchange_version_id)?->number }} · {{ $event->user_id===null ? 'Sistema' : ($event->user_id===$exchange->retailerA->user_id ? $exchange->retailerA->company_name : $exchange->retailerB->company_name) }}</li>
         @endforeach
     </ol>
     <x-button variant="secondary" :href="route('retailer.exchanges.index')">Tutti gli scambi</x-button>

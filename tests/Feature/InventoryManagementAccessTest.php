@@ -6,10 +6,13 @@ use App\Actions\ManageInventoryPhotos;
 use App\Models\AvailabilityRequest;
 use App\Models\Category;
 use App\Models\InventoryItem;
+use App\Models\Plan;
 use App\Models\Retailer;
 use App\Models\StockReservation;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Support\DisplayQuantity;
+use Database\Seeders\PlanSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -125,6 +128,94 @@ class InventoryManagementAccessTest extends TestCase
         AvailabilityRequest::factory()->create(['inventory_item_id' => $i->id, 'retailer_id' => $i->retailer_id, 'quantity' => '1']);
         $this->actingAs($i->retailer->user)->delete(route('inventory.destroy', $i))->assertRedirect();
         $this->get(route('retailer.requests'))->assertOk()->assertSee($i->name)->assertDontSee('1.000');
+    }
+
+    public function test_deleted_articles_disappear_from_operational_lists_and_marketplace(): void
+    {
+        $i = $this->item();
+        $this->actingAs($i->retailer->user)->get(route('retailer.stock'))
+            ->assertSee('Elimina articolo')->assertSee('Ordini, scambi e storico saranno conservati.');
+        $this->delete(route('inventory.destroy', $i))->assertRedirect();
+        $this->get(route('retailer.stock'))->assertOk()->assertDontSee($i->name);
+        $this->get(route('marketplace.index'))->assertOk()->assertDontSee($i->name);
+        $this->get(route('marketplace.show', $i))->assertNotFound();
+        $this->actingAs(User::factory()->create(['role' => 'admin']))
+            ->get(route('admin.stock'))->assertOk()->assertDontSee($i->name);
+    }
+
+    public function test_other_retailer_cannot_submit_photo_removal_or_replacement(): void
+    {
+        Storage::fake('local');
+        $i = $this->item('draft');
+        $path = 'inventory/'.Str::uuid().'.jpg';
+        Storage::disk('local')->put($path, 'private photo');
+        $i->images()->create(['disk' => 'local', 'path' => $path, 'position' => 0]);
+        $version = app(ManageInventoryPhotos::class)->version($i);
+        $this->actingAs(Retailer::factory()->approved()->create()->user);
+        $this->put(route('inventory.photos.update', $i), ['version' => $version, 'remove' => [0]])->assertForbidden();
+        $this->put(route('inventory.photos.update', $i), ['version' => $version, 'replacements' => [0 => $this->photo()]])->assertForbidden();
+        $this->assertSame($path, $i->images()->sole()->path);
+        Storage::disk('local')->assertExists($path);
+        $this->assertCount(1, Storage::disk('local')->allFiles('inventory'));
+    }
+
+    public function test_admin_can_replace_a_draft_photo_and_owner_can_remove_cover_or_all_photos(): void
+    {
+        Storage::fake('local');
+        $i = $this->item('draft');
+        $refs = [];
+        foreach ([0, 1] as $position) {
+            $path = 'inventory/'.Str::uuid().'.jpg';
+            Storage::disk('local')->put($path, 'private photo '.$position);
+            $refs[] = $path;
+            $i->images()->create(['disk' => 'local', 'path' => $path, 'position' => $position]);
+        }
+        $photos = app(ManageInventoryPhotos::class);
+        $this->actingAs(User::factory()->create(['role' => 'admin']))
+            ->put(route('inventory.photos.update', $i), ['version' => $photos->version($i), 'replacements' => [1 => $this->photo()]])
+            ->assertSessionHasNoErrors();
+        $newPath = $i->images()->where('position', 1)->sole()->path;
+        $this->assertNotSame($refs[1], $newPath);
+        Storage::disk('local')->assertExists($newPath);
+        $this->actingAs($i->retailer->user)->get(route('inventory.photos.edit', $i))->assertOk()->assertSee('Copertina');
+        $this->put(route('inventory.photos.update', $i), ['version' => $photos->version($i), 'remove' => [0]])->assertSessionHasNoErrors();
+        $cover = $i->images()->sole();
+        $this->assertSame(0, $cover->position);
+        $this->assertSame($newPath, $cover->path);
+        $this->put(route('inventory.photos.update', $i), ['version' => $photos->version($i), 'remove' => [0]])->assertSessionHasNoErrors();
+        $this->assertSame(0, $i->images()->count());
+        $this->get(route('inventory.photos.edit', $i))->assertOk()->assertSee('Nessuna foto caricata');
+        // Private superseded files are deliberately retained by the existing history contract.
+        foreach ([...$refs, $newPath] as $path) {
+            Storage::disk('local')->assertExists($path);
+        }
+    }
+
+    public function test_removing_published_cover_keeps_marketplace_photo_until_admin_review(): void
+    {
+        Storage::fake('local');
+        $this->seed(PlanSeeder::class);
+        $i = $this->item();
+        Subscription::factory()->active()->create(['retailer_id' => $i->retailer_id, 'plan_id' => Plan::where('code', 'free')->sole()->id]);
+        $refs = [];
+        foreach ([0, 1] as $position) {
+            $path = 'inventory/'.Str::uuid().'.jpg';
+            Storage::disk('local')->put($path, 'published photo '.$position);
+            $refs[] = $path;
+            $i->images()->create(['disk' => 'local', 'path' => $path, 'position' => $position]);
+        }
+        $this->actingAs($i->retailer->user)->put(route('inventory.photos.update', $i), [
+            'version' => app(ManageInventoryPhotos::class)->version($i), 'remove' => [0],
+        ])->assertSessionHasNoErrors();
+        $this->get(route('marketplace.image', [$i, 0]))->assertOk()->assertStreamedContent('published photo 0');
+        $this->assertSame($refs[0], $i->images()->where('position', 0)->sole()->path);
+        $this->actingAs(User::factory()->create(['role' => 'admin']))
+            ->patch(route('admin.stock.review', $i), ['decision' => 'published'])->assertSessionHasNoErrors();
+        $this->assertSame($refs[1], $i->images()->sole()->path);
+        $this->assertSame(0, $i->images()->sole()->position);
+        $this->get(route('marketplace.image', [$i, 0]))->assertOk()->assertStreamedContent('published photo 1');
+        $this->get(route('marketplace.image', [$i, 1]))->assertNotFound();
+        Storage::disk('local')->assertExists($refs[0]);
     }
 
     public function test_deleted_articles_keep_their_category_reference_protected(): void

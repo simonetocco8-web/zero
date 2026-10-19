@@ -1,10 +1,10 @@
 <x-layouts.retailer title="Scambi">
     <h1>Scambi tra rivenditori</h1>
-    <p class="mt-3 text-slate-600">Proposte e riepiloghi versionati. Per iniziare, scegli un prodotto scambiabile nel marketplace.</p>
+    <p class="mt-3 text-muted">Proposte e riepiloghi versionati. Per iniziare, scegli un prodotto scambiabile nel marketplace.</p>
     <x-button class="mt-4" :href="route('marketplace.index')">Esplora il marketplace</x-button>
     <nav aria-label="Filtri scambi" class="my-6 flex flex-wrap gap-2">
         @foreach(['all'=>'Tutti','received'=>'Ricevuti','sent'=>'Inviati','to_accept'=>'Da accettare','payment'=>'In pagamento','completed'=>'Completati','closed'=>'Rifiutati/scaduti'] as $key=>$label)
-            <a class="inline-flex min-h-11 items-center rounded-xl border px-4 py-2 {{ $tab===$key ? 'border-brand-700 bg-brand-700 text-white':'border-slate-300 bg-white text-slate-800' }}" href="{{ route('retailer.exchanges.index',['tab'=>$key]) }}" @if($tab===$key) aria-current="page" @endif>{{ $label }}</a>
+            <a class="inline-flex min-h-11 items-center rounded-xl border px-4 py-2 {{ $tab===$key ? 'border-brand-700 bg-brand-700 text-canvas':'border-line bg-surface text-ink' }}" href="{{ route('retailer.exchanges.index',['tab'=>$key]) }}" @if($tab===$key) aria-current="page" @endif>{{ $label }}</a>
         @endforeach
     </nav>
     <div class="grid gap-4 lg:grid-cols-2">

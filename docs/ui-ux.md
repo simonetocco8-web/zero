@@ -1,5 +1,15 @@
 # UI e UX
 
+## Refresh coordinato navy/aqua — 19 ottobre 2026
+
+EXISTING: tema scuro centralizzato in `resources/css/app.css`, applicato a layout, accesso/registrazione, dashboard, catalogo, card, badge, form, notifiche e dialog. I token `canvas`, `surface`, `raised`, `line`, `control`, `ink` e `muted` separano le superfici dal testo; aqua identifica CTA e focus, con testo navy sui pulsanti pieni. Stati di errore/successo mantengono etichette e colori distinti. Nessun font remoto, framework o dipendenza applicativa aggiunti.
+
+La homepage ospiti usa due sole CTA nel contenuto: **Accedi** e **Registrati**. La registrazione rivenditore mantiene il collegamento al profilo cliente. Header/footer della sola pagina iniziale omettono le azioni duplicate; Privacy e navigazione delle altre pagine restano disponibili. La comunicazione riguarda vendita dell’invenduto, liquidità e scambi PRO, senza rendere pubblico il catalogo riservato.
+
+Eliminazione articoli e gestione foto riutilizzano Actions/Policies esistenti. Il dialog di eliminazione esplicita indisponibilità nel catalogo, conservazione dello storico e blocco prenotazioni attive. La gestione foto identifica la copertina, spiega l’ordine successivo e lo stato senza immagini; selezionando Elimina disabilita il file di sostituzione della stessa foto. La validazione server del conflitto rimane attiva anche senza JavaScript. Foto pubblicate aggiornate solo dopo moderazione; file privati storici conservati secondo [inventory-access.md](inventory-access.md).
+
+Verifiche e file interessati in [ui-refresh-20261019.md](ui-refresh-20261019.md).
+
 ## Aggiornamento approvato — 18 ottobre 2026
 
 Marketplace riservato agli utenti autenticati (rivendite approved), homepage ospiti con accesso/registrazione; eliminazione recuperabile articoli owner/admin, gestione foto con moderazione e quantità senza zeri decimali superflui. Questo aggiornamento supera le descrizioni storiche del catalogo pubblico. Contratti e migration in [inventory-access.md](inventory-access.md).
@@ -63,7 +73,7 @@ Verificare almeno viewport 320/375/768/1280 px, zoom, tastiera e flussi touch. T
 
 ## Design system implementato (Prompt 1)
 
-Componenti in `resources/views/components`: `button` (primary/secondary/danger), `field`, `select`, `textarea`, `checkbox`, `card`, `alert`, `badge`, `modal`, `toast`, `empty-state`, `loading-state`. Token e classi base in `resources/css/app.css`: palette verde/slate, font di sistema senza richieste esterne, spaziatura Tailwind su scala di 4 px, pulsanti/input con altezza minima 44 px.
+Componenti in `resources/views/components`: `button` (primary/secondary/danger), `field`, `select`, `textarea`, `checkbox`, `card`, `alert`, `badge`, `modal`, `toast`, `empty-state`, `loading-state`. Token e classi base in `resources/css/app.css`: palette navy/aqua con token semantici per sfondo, superfici, bordi e testo, font di sistema senza richieste esterne, spaziatura Tailwind su scala di 4 px, pulsanti/input con altezza minima 44 px.
 
 Layout `components/layouts/retailer.blade.php` e `admin.blade.php` condividono `area-shell`. Sidebar da 1024 px; sotto tale soglia header compatto e bottom navigation rivenditore a tre colonne/due righe, con spazio finale e safe area. Amministratore con menu mobile che va a capo. Le pagine commerciali mostrano esplicitamente lo stato «In preparazione», senza saldi o dati inventati.
 
