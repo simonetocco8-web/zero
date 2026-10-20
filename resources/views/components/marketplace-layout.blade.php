@@ -2,18 +2,18 @@
 <!DOCTYPE html>
 <html data-theme="light" lang="it">
 <head><x-head :title="$title" :description="$description" :canonical="$canonical" :image="$image" robots="noindex,nofollow" /></head>
-<body>
+<body class="marketplace-page">
+<x-theme-toggle />
 <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:bg-surface focus:p-3">Vai al contenuto</a>
 <header class="border-b border-line bg-surface">
     <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
         <a href="{{ route('home') }}" class="inline-flex min-h-11 items-center"><x-brand /></a>
-        <x-theme-toggle />
         @if($entry)
             <span class="text-xs font-semibold text-muted">Materiali fermi. Nuove possibilità.</span>
         @else
             <nav aria-label="Navigazione principale" class="flex flex-wrap items-center gap-2">
                 <a class="btn btn-secondary" href="{{ route('marketplace.index') }}">Marketplace</a>
-                <a class="btn btn-secondary" href="{{ route('home') }}#home-categories">Categorie</a>
+                <x-category-menu />
                 @auth
                     @can('purchase', \App\Models\User::class)
                         <a class="btn btn-secondary" href="{{ route('cart.index') }}">Carrello</a>
