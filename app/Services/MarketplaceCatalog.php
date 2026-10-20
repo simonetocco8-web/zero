@@ -15,7 +15,7 @@ class MarketplaceCatalog
 
     public function query(array $filters = [], ?Category $category = null): Builder
     {
-        $query = $this->public->query()->select(['inventory_items.id', 'retailer_id', 'category_id', 'name', 'description', 'brand', 'sku', 'ean', 'category', 'condition', 'province', 'quantity_milliunits', 'unit', 'currency', 'zero_price_cents', 'shipping_cost_cents', 'delivery_notes', 'vat_treatment', 'pickup_available', 'shipping_available', 'exchange_available', 'status', 'published_at'])->with(['retailer:id,company_name,city,province,status', 'categoryRecord:id,name,slug,is_active', 'images' => fn ($q) => $q->select(['id', 'inventory_item_id', 'disk', 'path', 'position', 'alt_text'])->orderBy('position')]);
+        $query = $this->public->query()->select(['inventory_items.id', 'retailer_id', 'category_id', 'name', 'description', 'brand', 'sku', 'ean', 'category', 'condition', 'province', 'quantity_milliunits', 'unit', 'currency', 'zero_price_cents', 'list_price_cents', 'shipping_cost_cents', 'delivery_notes', 'vat_treatment', 'pickup_available', 'shipping_available', 'exchange_available', 'status', 'published_at'])->with(['retailer:id,company_name,city,province,status', 'categoryRecord:id,name,slug,is_active', 'images' => fn ($q) => $q->select(['id', 'inventory_item_id', 'disk', 'path', 'position', 'alt_text'])->orderBy('position')]);
         $query->selectSub(StockReservation::selectRaw('COALESCE(SUM(quantity_milliunits), 0)')->whereColumn('inventory_item_id', 'inventory_items.id')->where('status', 'active')->where('expires_at', '>', now()), 'reserved_milliunits');
         if ($category) {
             $query->where('category_id', $category->id);
@@ -52,6 +52,29 @@ class MarketplaceCatalog
             'oldest' => $query->orderBy('published_at')->orderBy('id'),
             default => $query->orderByDesc('published_at')->orderByDesc('id')
         };
+    }
+
+    public function homeData(): array
+    {
+        $categories = $this->categories();
+        $sections = collect([
+            ['title' => 'Materiali per costruire', 'names' => ['edilizia', 'edilizia pesante']],
+            ['title' => 'Attrezzatura per lavorare', 'names' => ['ferramenta', 'elettroutensili']],
+        ])->map(function ($section) use ($categories) {
+            $selected = $categories->filter(fn ($category) => in_array(mb_strtolower($category->name), $section['names'], true) || in_array($category->slug, array_map(fn ($name) => str_replace(' ', '-', $name), $section['names']), true));
+
+            return ['title' => $section['title'], 'items' => $selected->isEmpty() ? collect() : $this->query()->whereIn('category_id', $selected->pluck('id'))->limit(4)->get()];
+        });
+
+        return [
+            'categories' => $categories,
+            'items' => $this->query()->limit(8)->get(),
+            'featured' => config('marketplace.featured_item_ids') ? $this->query()->whereIn('id', config('marketplace.featured_item_ids'))->limit(8)->get() : collect(),
+            'deals' => $this->query()->whereColumn('list_price_cents', '>', 'zero_price_cents')->limit(8)->get(),
+            'exchangeItems' => $this->query(['exchange_available' => true])->limit(4)->get(),
+            'brands' => $this->public->query()->whereNotNull('brand')->whereRaw("TRIM(brand) <> ''")->distinct()->orderBy('brand')->limit(15)->pluck('brand'),
+            'categorySections' => $sections,
+        ];
     }
 
     public function categories()

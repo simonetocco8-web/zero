@@ -6,21 +6,21 @@
 
 @theme {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-    --color-canvas: #080f1c;
-    --color-surface: #101e30;
-    --color-raised: #192c43;
-    --color-line: #405670;
-    --color-control: #68839f;
-    --color-ink: #f2f7fc;
-    --color-muted: #b2c3d6;
-    --color-brand-50: #12343b;
-    --color-brand-100: #1b4850;
+    --color-canvas: #ffffff;
+    --color-surface: #ffffff;
+    --color-raised: #f3f6f8;
+    --color-line: #d8e1e7;
+    --color-control: #9babb7;
+    --color-ink: #071925;
+    --color-muted: #60717d;
+    --color-brand-50: #e6faf6;
+    --color-brand-100: #c8f4ed;
     --color-brand-600: #38ddca;
-    --color-brand-700: #75efdf;
+    --color-brand-700: #096b60;
     --color-brand-950: #0b1728;
 }
 @layer base {
-    html { color-scheme: dark; overflow-wrap: anywhere; scroll-padding-bottom: 12rem; }
+    html { color-scheme: light; overflow-wrap: anywhere; scroll-padding-bottom: 12rem; }
     body { @apply bg-canvas text-ink font-sans antialiased; }
     h1 { @apply text-2xl sm:text-3xl font-bold tracking-tight; }
     h2 { @apply text-xl font-semibold tracking-tight; }
@@ -37,7 +37,7 @@
 }
 @layer components {
     .btn { @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
-    .btn-primary { @apply bg-brand-600 text-canvas hover:bg-brand-700; }
+    .btn-primary { @apply bg-brand-600 text-brand-950 hover:bg-brand-700; }
     .btn-secondary { @apply border border-control bg-surface text-ink hover:bg-raised; }
     .btn-danger { @apply bg-red-700 text-white hover:bg-red-800; }
     .field { @apply block w-full min-h-11 rounded-xl border-control bg-canvas text-ink shadow-sm focus:border-brand-600 focus:ring-brand-600; }
@@ -45,10 +45,35 @@
     .field-label { @apply block mb-1.5 text-sm font-medium text-ink; }
     .nav-item { @apply flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium; }
     .nav-active { @apply bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-600/30; }
-    .nav-idle { @apply text-muted hover:bg-white/5 hover:text-white; }
-    .brand-eyebrow { @apply text-xs font-bold uppercase tracking-widest text-brand-600; }
+    .nav-idle { @apply text-muted hover:bg-raised hover:text-ink; }
+    .brand-eyebrow { @apply text-xs font-bold uppercase tracking-widest text-brand-700; }
     .brand-hero { @apply rounded-3xl border border-line bg-surface; background-image: radial-gradient(ellipse at top right, rgb(56 221 202 / 0.09), transparent 60%); }
 }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-canvas: #080f1c;
+    --color-surface: #101e30;
+    --color-raised: #192c43;
+    --color-line: #405670;
+    --color-control: #68839f;
+    --color-ink: #f2f7fc;
+    --color-muted: #b2c3d6;
+    --color-brand-50: #12343b;
+    --color-brand-100: #1b4850;
+    --color-brand-700: #75efdf;
+}
+.brand-logo { width: 11rem; max-width: 100%; height: auto; max-height: 3.5rem; object-fit: contain; }
+.brand-logo-wrap { background: white; padding: .35rem .6rem; border-radius: .65rem; }
+.management-sidebar .nav-idle { color: #b2c3d6; }
+.management-sidebar .nav-idle:hover { color: white; background: #192c43; }
+.management-sidebar .nav-active { color: #75efdf; background: #12343b; }
+.product-rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 82%); gap: 1.25rem; overflow-x: auto; padding: .25rem .15rem 1rem; scroll-snap-type: x proximity; }
+.product-rail > * { scroll-snap-align: start; }
+@media (min-width: 640px) { .product-rail { grid-auto-columns: minmax(0, 45%); } }
+@media (min-width: 1024px) { .product-rail { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: visible; } }
+.promo-navy { background: #0b1728; color: #f2f7fc; position: relative; overflow: hidden; }
+.promo-navy::after { content: ''; position: absolute; width: 18rem; height: 18rem; border: 3rem solid #38ddca; opacity: .12; border-radius: 50%; right: -7rem; top: -6rem; pointer-events: none; }

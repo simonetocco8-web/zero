@@ -24,7 +24,7 @@ class MarketplaceController extends Controller
             return to_route('dashboard');
         }
 
-        return view('marketplace.home', ['categories' => $catalog->categories(), 'items' => $catalog->query()->limit(8)->get(), 'featured' => config('marketplace.featured_item_ids') ? $catalog->query()->whereIn('id', config('marketplace.featured_item_ids'))->limit(8)->get() : collect()]);
+        return view('marketplace.home', $catalog->homeData());
     }
 
     public function index(MarketplaceRequest $request, MarketplaceCatalog $catalog, ?Category $category = null)
