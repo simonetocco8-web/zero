@@ -9,9 +9,17 @@
 <div class="col-span-2 flex min-h-48 items-center justify-center rounded-2xl bg-brand-50"><x-icon name="exchange" class="size-24 text-brand-700" /><span class="sr-only">Nuove opportunità per i materiali</span></div>@endforelse
 </div>
 </section>
-<section class="mt-10" aria-labelledby="home-categories"><h2 id="home-categories">Esplora le categorie</h2><div class="mt-5 flex flex-wrap gap-3">
-@foreach($categories as $category)<a class="inline-flex min-h-14 items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 font-semibold hover:border-brand-600" href="{{ route('marketplace.category', $category->slug) }}"><x-icon name="box" class="text-brand-700" />{{ $category->name }}</a>@endforeach
-</div></section>
+<section class="mt-10" aria-labelledby="home-categories">
+    <h2 id="home-categories">Esplora le categorie</h2>
+    <div class="category-circles mt-5" tabindex="0" role="region" aria-label="Esplora tutte le categorie">
+        @foreach($categories as $category)
+            <a class="category-circle-link" href="{{ route('marketplace.category', $category->slug) }}">
+                <span class="category-circle"><x-category-icon :category="$category" class="size-9 sm:size-11" /></span>
+                <span>{{ $category->name }}</span>
+            </a>
+        @endforeach
+    </div>
+</section>
 <section aria-label="I vantaggi" class="my-10 grid gap-4 border-y border-line py-6 sm:grid-cols-2 lg:grid-cols-4">
 @foreach(['users'=>'Rivenditori verificati','wallet'=>'Prezzi da giacenza','box'=>'Spedizione o ritiro','exchange'=>'Scambio tra rivenditori'] as $icon=>$label)<div class="flex items-center gap-3 font-semibold"><span class="rounded-xl bg-brand-50 p-3 text-brand-700"><x-icon :name="$icon" /></span>{{ $label }}</div>@endforeach
 </section>
@@ -39,8 +47,25 @@
 @foreach($section['items'] as $item)<x-marketplace-card :item="$item" />@endforeach
 </div></section>@endif
 @endforeach
-<section class="my-12 rounded-3xl border border-line bg-raised p-5 sm:p-8" aria-labelledby="reviews-title"><p class="brand-eyebrow">TESTIMONIANZE DIMOSTRATIVE</p><h2 id="reviews-title" class="mt-2">Cosa dicono di ZeroMagazzino</h2><p class="mt-3 text-lg font-bold">{{ number_format(collect(config('marketplace_reviews'))->avg('rating'), 1, ',', '.') }}/5 <span class="text-sm font-normal text-muted">· {{ count(config('marketplace_reviews')) }} recensioni demo</span></p><p class="mt-2 text-sm text-muted">Nomi fittizi e testi di esempio: queste recensioni demo non rappresentano esperienze verificate.</p><div class="product-rail mt-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700" tabindex="0" role="region" aria-label="Recensioni demo">
-@foreach(config('marketplace_reviews') as $review)<article class="rounded-2xl border border-line bg-surface p-5"><div class="flex items-center justify-between gap-2"><span role="img" class="text-brand-700" aria-label="{{ $review['rating'] }} stelle su 5"><span aria-hidden="true">{{ str_repeat('★', $review['rating']) }}{{ str_repeat('☆', 5-$review['rating']) }}</span></span><span class="rounded-full bg-raised px-2 py-1 text-xs font-semibold">Demo</span></div><p class="my-4 text-sm leading-relaxed">{{ $review['text'] }}</p><p class="font-semibold">{{ $review['name'] }}</p><p class="mt-1 text-xs text-muted">{{ $review['business'] }}</p></article>@endforeach
-</div></section>
+<section class="reviews-slider my-12 rounded-3xl border border-line bg-raised p-5 sm:p-8" aria-labelledby="reviews-title" x-data="reviewsSlider">
+    <p class="brand-eyebrow">TESTIMONIANZE DIMOSTRATIVE</p>
+    <div class="mt-2 flex flex-wrap items-center justify-between gap-4">
+        <h2 id="reviews-title">Cosa dicono di ZeroMagazzino</h2>
+        <div class="flex gap-2" aria-label="Controlli recensioni">
+            <button type="button" class="btn btn-secondary" aria-label="Recensione precedente" aria-controls="reviews-track" @click="step(-1)"><x-icon name="chevron-left" /></button>
+            <button type="button" class="btn btn-secondary" aria-label="Recensione successiva" aria-controls="reviews-track" @click="step(1)"><x-icon name="chevron-right" /></button>
+        </div>
+    </div>
+    <p class="mt-3 text-lg font-bold">{{ number_format(collect(config('marketplace_reviews'))->avg('rating'), 1, ',', '.') }}/5 <span class="text-sm font-normal text-muted">· {{ count(config('marketplace_reviews')) }} recensioni demo</span></p>
+    <p class="mt-2 text-sm text-muted">Nomi fittizi e testi di esempio: queste recensioni demo non rappresentano esperienze verificate.</p>
+    <div id="reviews-track" class="reviews-slider-track mt-6" x-ref="track" tabindex="0" role="region" aria-label="Recensioni demo, scorri per leggerle tutte" @keydown.arrow-left.prevent="step(-1)" @keydown.arrow-right.prevent="step(1)" @keydown.home.prevent="goTo(false)" @keydown.end.prevent="goTo(true)">
+        @foreach(config('marketplace_reviews') as $review)
+            <article class="review-card rounded-2xl border border-line bg-surface p-5">
+                <div class="flex items-center justify-between gap-2"><span role="img" class="text-brand-700" aria-label="{{ $review['rating'] }} stelle su 5"><span aria-hidden="true">{{ str_repeat('★', $review['rating']) }}{{ str_repeat('☆', 5-$review['rating']) }}</span></span><span class="rounded-full bg-raised px-2 py-1 text-xs font-semibold">Demo</span></div>
+                <p class="my-4 text-sm leading-relaxed">{{ $review['text'] }}</p><p class="font-semibold">{{ $review['name'] }}</p><p class="mt-1 text-xs text-muted">{{ $review['business'] }}</p>
+            </article>
+        @endforeach
+    </div>
+</section>
 <section class="promo-navy rounded-3xl p-7 sm:p-10"><h2 class="text-3xl">Hai materiali fermi in magazzino?</h2><p class="mt-3 text-[#b2c3d6]">Trasformali in liquidità o usali per uno scambio.</p><a class="btn mt-6 bg-brand-600 text-brand-950" href="{{ route('register') }}">Diventa rivenditore <x-icon name="arrow" /></a></section>
 </x-marketplace-layout>

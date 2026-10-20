@@ -9,7 +9,7 @@ $href=fn($l)=>route($l['route'],$l['parameters']??[]).(isset($l['fragment'])?'#'
 $isActive=fn($l)=>request()->routeIs($l['pattern']??$l['route']) && (!isset($l['parameters']['resource'])||request()->route('resource')===$l['parameters']['resource']);
 $home=match($area){'admin'=>'admin.dashboard','retailer'=>'retailer.dashboard',default=>'customer.dashboard'};
 @endphp
-<!DOCTYPE html><html data-theme="light" lang="{{ str_replace('_','-',app()->getLocale()) }}"><head><x-head :title="$title" :canonical="url()->current()" robots="noindex,follow" /></head><body>
+<!DOCTYPE html><html data-theme="light" lang="{{ str_replace('_','-',app()->getLocale()) }}"><head><x-head :title="$title" :canonical="url()->current()" robots="noindex,follow" /></head><body class="area-page"><x-theme-toggle />
 <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:bg-surface focus:p-3">Vai al contenuto</a>
 <div class="min-h-dvh lg:flex">
     <aside class="management-sidebar hidden border-r border-line bg-brand-950 text-white lg:flex lg:w-64 lg:shrink-0 lg:flex-col">
@@ -29,7 +29,7 @@ $home=match($area){'admin'=>'admin.dashboard','retailer'=>'retailer.dashboard',d
         <header class="border-b border-line bg-surface px-4 sm:px-6 lg:px-10">
             <div class="flex min-h-20 flex-wrap items-center justify-between gap-3 py-3">
                 <a href="{{ route($home) }}" class="inline-flex min-h-11 items-center"><x-brand class="text-sm" /></a>
-                <div class="flex flex-wrap gap-2"><x-theme-toggle /><x-button variant="secondary" :href="route('notifications.index')">Notifiche</x-button><form method="POST" action="{{ route('logout') }}">@csrf<x-button variant="secondary" type="submit">Esci</x-button></form></div>
+                <div class="flex flex-wrap gap-2"><x-button variant="secondary" :href="route('notifications.index')">Notifiche</x-button><form method="POST" action="{{ route('logout') }}">@csrf<x-button variant="secondary" type="submit">Esci</x-button></form></div>
             </div>
             <details class="pb-3 lg:hidden"><summary class="flex min-h-11 cursor-pointer items-center font-semibold">Menu {{ $area==='admin'?'amministrazione':($area==='retailer'?'rivenditore':'cliente') }}</summary><nav aria-label="Sezioni riservate" class="grid gap-2 py-3 sm:grid-cols-2">
                 @foreach($links as $link)

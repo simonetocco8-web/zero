@@ -12,7 +12,7 @@
         document.querySelectorAll('[data-theme-toggle]').forEach(button => {
             button.setAttribute('aria-pressed', String(theme === 'dark'));
             button.setAttribute('aria-label', theme === 'dark' ? 'Attiva tema chiaro' : 'Attiva tema scuro');
-            button.querySelector('[data-theme-state]').textContent = theme === 'dark' ? '☾ Dark' : '☀ Light';
+            button.title = theme === 'dark' ? 'Tema chiaro' : 'Tema scuro';
         });
     };
     let theme = 'light';
