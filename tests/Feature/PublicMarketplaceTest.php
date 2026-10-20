@@ -42,6 +42,26 @@ class PublicMarketplaceTest extends TestCase
         return $r;
     }
 
+    public function test_home_refresh_uses_visible_deals_exchange_and_all_categories(): void
+    {
+        $deal = $this->product(['list_price_cents' => 2000, 'zero_price_cents' => 1000, 'exchange_available' => true]);
+        $ordinary = $this->product(['list_price_cents' => 1000, 'zero_price_cents' => 1000, 'exchange_available' => false]);
+        $hidden = $this->product(['status' => 'draft', 'brand' => 'Hidden brand', 'list_price_cents' => 3000, 'zero_price_cents' => 1000, 'exchange_available' => true]);
+        Category::create(['name' => 'Categoria extra', 'slug' => 'categoria-extra', 'is_active' => true, 'sort_order' => 99]);
+        $response = $this->get(route('home'))->assertOk()
+            ->assertSee('Il magazzino')->assertSee('Occasioni da non perdere')
+            ->assertSee('Categoria extra')->assertSee('20 recensioni demo')->assertSee('Demo')
+            ->assertSee('data-theme="light"', false)->assertSee('data-theme-toggle', false)
+            ->assertSee('/favicon-32x32.png', false)->assertSee('/apple-touch-icon.png', false)
+            ->assertDontSee('Hidden brand');
+        $response->assertViewHas('deals', fn ($items) => $items->modelKeys() === [$deal->id]);
+        $response->assertViewHas('exchangeItems', fn ($items) => $items->modelKeys() === [$deal->id]);
+        $response->assertViewHas('categories', fn ($items) => $items->count() === Category::where('is_active', true)->count());
+        $this->assertCount(20, config('marketplace_reviews'));
+        $this->assertSame(4.9, collect(config('marketplace_reviews'))->avg('rating'));
+        $this->get(route('marketplace.show', $hidden))->assertNotFound();
+    }
+
     public function test_home_catalog_and_category_use_only_local_approved_versions(): void
     {
         $i = $this->product(['status' => 'change_pending', 'proposed_data' => ['name' => 'Nome segreto proposta', 'brand' => 'Brand segreto', 'zero_price_cents' => 1, 'description' => 'Segreto proposta']]);
