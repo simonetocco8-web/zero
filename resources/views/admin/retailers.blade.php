@@ -4,5 +4,9 @@
 <div class="flex flex-wrap gap-3">@if($retailer->status->value === 'pending')
 <x-admin-confirm name="retailer-approve-{{ $retailer->id }}" label="APPROVA" :url="route('admin.retailers.review',$retailer)" decision="approved" />
 <x-admin-confirm name="retailer-reject-{{ $retailer->id }}" label="RIFIUTA" :url="route('admin.retailers.review',$retailer)" decision="rejected" variant="danger" :reason="true" />
-@elseif($retailer->status->value === 'approved')<x-admin-confirm name="retailer-suspend-{{ $retailer->id }}" label="SOSPENDI" :url="route('admin.retailers.review',$retailer)" decision="suspended" variant="danger" :reason="true" />@endif</div>
+@elseif($retailer->status->value === 'approved')<x-admin-confirm name="retailer-suspend-{{ $retailer->id }}" label="SOSPENDI" :url="route('admin.retailers.review',$retailer)" decision="suspended" variant="danger" :reason="true" />@endif
+@can('resetPassword', $retailer)
+<x-admin-confirm name="retailer-reset-password-{{ $retailer->id }}" label="Ripristina password" :url="route('admin.retailers.reset-password', $retailer)" method="POST" variant="secondary" :message="'Vuoi generare una nuova password temporanea per questo rivenditore? La password attuale verrà sostituita e la nuova password sarà inviata all’indirizzo email dell’account: '.$retailer->user->email.'.'" />
+@endcan
+</div>
 </x-card>@empty<x-empty-state title="Nessun rivenditore" description="Nessuna azienda corrisponde ai filtri." />@endforelse</div><div class="mt-5">{{ $retailers->links() }}</div></x-layouts.admin>

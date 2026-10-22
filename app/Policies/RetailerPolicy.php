@@ -19,6 +19,11 @@ class RetailerPolicy
         return $this->update($user, $retailer) && $retailer->status === RetailerStatus::Approved;
     }
 
+    public function resetPassword(User $user, Retailer $retailer): bool
+    {
+        return $user->role === UserRole::Admin;
+    }
+
     public function review(User $user, Retailer $retailer): bool
     {
         return $user->role === UserRole::Admin;

@@ -19,14 +19,14 @@ class RecordAdministrativeAction
     {
         Gate::forUser($actor)->authorize('accessAdministration', User::class);
         $expected = match ($action) {
-            AdministrativeAction::RetailerApproved, AdministrativeAction::RetailerRejected, AdministrativeAction::RetailerSuspended => Retailer::class,
+            AdministrativeAction::RetailerApproved, AdministrativeAction::RetailerRejected, AdministrativeAction::RetailerSuspended, AdministrativeAction::RetailerPasswordReset => Retailer::class,
             AdministrativeAction::InventoryApproved, AdministrativeAction::InventoryRejected, AdministrativeAction::InventoryPublished => InventoryItem::class,
             AdministrativeAction::PayoutPaid, AdministrativeAction::PayoutRejected => PayoutRequest::class,
         };
         if (! $subject instanceof $expected || ! $subject->exists) {
             throw new InvalidArgumentException('Administrative action requires a persisted subject of the matching type.');
         }
-        $allowed = ['status', 'approved_at', 'rejected_at', 'published_at', 'paid_at', 'amount_cents', 'currency', 'external_provider', 'external_product_id'];
+        $allowed = ['password_reset', 'status', 'approved_at', 'rejected_at', 'published_at', 'paid_at', 'amount_cents', 'currency', 'external_provider', 'external_product_id'];
 
         return AuditLog::create([
             'actor_user_id' => $actor->getKey(),

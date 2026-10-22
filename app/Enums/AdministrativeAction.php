@@ -4,6 +4,7 @@ namespace App\Enums;
 
 enum AdministrativeAction: string
 {
+    case RetailerPasswordReset = 'retailer_password_reset';
     case RetailerApproved = 'retailer_approved';
     case RetailerRejected = 'retailer_rejected';
     case RetailerSuspended = 'retailer_suspended';

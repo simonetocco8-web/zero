@@ -46,7 +46,7 @@ class LoginRequest extends FormRequest
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => $this->authMessage('failed', 'Le credenziali inserite non sono corrette.'),
             ]);
         }
 
@@ -69,11 +69,25 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
+            'email' => $this->authMessage('throttle', 'Troppi tentativi di accesso. Riprova tra :seconds secondi.', [
                 'seconds' => $seconds,
                 'minutes' => ceil($seconds / 60),
             ]),
         ]);
+    }
+
+    private function authMessage(string $key, string $fallback, array $replace = []): string
+    {
+        $message = trans('auth.'.$key, $replace, 'it');
+
+        if (! is_string($message) || $message === 'auth.'.$key) {
+            $message = $fallback;
+            foreach ($replace as $name => $value) {
+                $message = str_replace(':'.$name, (string) $value, $message);
+            }
+        }
+
+        return $message;
     }
 
     /**
