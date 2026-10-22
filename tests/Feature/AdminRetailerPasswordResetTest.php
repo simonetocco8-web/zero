@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Mockery;
 use Tests\Concerns\AdditiveRefreshDatabase;
 use Tests\TestCase;
 
@@ -74,7 +75,7 @@ class AdminRetailerPasswordResetTest extends TestCase
         Mail::assertSent(RetailerTemporaryPasswordMail::class, function ($mail) use ($user, $newHash, &$temporary) {
             $mail->build();
             $temporary = $mail->viewData['temporaryPassword'];
-            $this->assertGreaterThanOrEqual(16, strlen($temporary));
+            $this->assertSame(24, strlen($temporary));
             foreach (['/[a-z]/', '/[A-Z]/', '/[0-9]/', '/[^a-zA-Z0-9]/'] as $pattern) {
                 $this->assertMatchesRegularExpression($pattern, $temporary);
             }
@@ -108,6 +109,39 @@ class AdminRetailerPasswordResetTest extends TestCase
         Log::shouldNotHaveReceived('error');
         Log::shouldNotHaveReceived('info');
         Log::shouldNotHaveReceived('debug');
+    }
+
+    public function test_generation_retries_each_missing_character_category_deterministically(): void
+    {
+        Mail::fake();
+        $candidates = [
+            str_repeat('A', 21).'B1!', // No lowercase.
+            str_repeat('a', 21).'b1!', // No uppercase.
+            str_repeat('a', 21).'Ab!', // No number.
+            str_repeat('a', 21).'Ab1', // No symbol.
+            str_repeat('a', 21).'A1!', // All four categories.
+        ];
+        foreach ($candidates as $candidate) {
+            $this->assertSame(24, strlen($candidate));
+        }
+        $action = Mockery::mock(ResetRetailerPassword::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $action->shouldReceive('passwordCandidate')->times(count($candidates))->andReturn(...$candidates);
+        $this->app->instance(ResetRetailerPassword::class, $action);
+
+        $this->actingAs($this->admin)->post($this->url())->assertSessionHasNoErrors()->assertRedirect(route('admin.retailers'));
+
+        Mail::assertSent(RetailerTemporaryPasswordMail::class, function ($mail) use ($candidates) {
+            $mail->build();
+            $password = $mail->viewData['temporaryPassword'];
+            $this->assertSame($candidates[4], $password);
+            $this->assertTrue(Hash::check($password, $this->retailer->user->fresh()->password));
+            foreach (['/[a-z]/', '/[A-Z]/', '/[0-9]/', '/[^a-zA-Z0-9]/'] as $pattern) {
+                $this->assertMatchesRegularExpression($pattern, $password);
+            }
+
+            return $mail->hasTo($this->retailer->user->email);
+        });
+        Mail::assertSentCount(1);
     }
 
     public function test_mail_failure_rolls_back_hash_remember_token_and_audit_without_logging(): void
