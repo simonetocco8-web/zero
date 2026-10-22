@@ -1,6 +1,8 @@
 @php
     $data = $item->proposed_data ?? $item->getAttributes();
     $publication = $item->latestPublication;
+    $proposedPhoto = $item->proposed_data && !empty($item->proposed_images);
+    $photoPosition = $proposedPhoto ? array_key_first($item->proposed_images) : $item->images->sortBy('position')->first()?->position;
     $money = fn ($key) => isset($data[$key]) ? \App\Support\DisplayMoney::euros($data[$key]) : 'Non indicato';
     $yesNo = fn ($key) => !empty($data[$key]) ? 'Sì' : 'No';
     $details = [
@@ -33,6 +35,11 @@
 @endphp
 <x-modal name="stock-detail-{{ $item->id }}" title="Dettaglio giacenza #{{ $item->id }}">
     @if($item->proposed_data)<p class="mb-4 text-sm text-muted">Dati proposti in verifica.</p>@endif
+    @if($photoPosition !== null)
+        <img src="{{ route('inventory.image', [$item, $photoPosition, 'proposed' => $proposedPhoto ? 1 : 0]) }}" alt="Immagine di {{ $data['name'] }}" loading="lazy" decoding="async" class="mb-5 max-h-56 w-full rounded-xl border border-line bg-raised object-contain">
+    @else
+        <p class="mb-5 rounded-xl border border-line bg-raised p-4 text-sm text-muted">Nessuna immagine disponibile</p>
+    @endif
     <dl class="grid min-w-0 gap-4 sm:grid-cols-2">
         @foreach($details as $label => $value)
             <div class="min-w-0"><dt class="text-sm text-muted">{{ $label }}</dt><dd class="break-words">{{ $value }}</dd></div>

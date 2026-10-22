@@ -4,10 +4,11 @@ namespace App\Actions;
 
 use App\Enums\AdministrativeAction;
 use App\Enums\UserRole;
+use App\Exceptions\EmailDeliveryNotConfigured;
 use App\Mail\RetailerTemporaryPasswordMail;
 use App\Models\Retailer;
 use App\Models\User;
-use Illuminate\Support\ConfigurationUrlParser;
+use App\Services\DeliveringMailerGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
@@ -23,7 +24,7 @@ class ResetRetailerPassword
         Gate::forUser($actor)->authorize('resetPassword', $retailer);
 
         try {
-            $this->ensureDeliveringMailer(config('mail.default'));
+            app(DeliveringMailerGuard::class)->ensure();
 
             // Do not retry a transaction containing an external delivery.
             return DB::transaction(function () use ($actor, $retailer) {
@@ -45,6 +46,10 @@ class ResetRetailerPassword
 
                 return $user->email;
             });
+        } catch (EmailDeliveryNotConfigured) {
+            throw ValidationException::withMessages([
+                'password_reset' => 'Invio email non configurato sul server. La password non è stata modificata.',
+            ]);
         } catch (Throwable) {
             // Never report the transport exception: its payload can contain the password.
             throw ValidationException::withMessages([
@@ -56,31 +61,5 @@ class ResetRetailerPassword
     protected function passwordCandidate(): string
     {
         return Str::password(24);
-    }
-
-    private function ensureDeliveringMailer(string $name, array $visited = []): void
-    {
-        if (config('mail.driver') || in_array($name, $visited, true)) {
-            throw new RuntimeException('Invalid mailer configuration.');
-        }
-        $mailer = config('mail.mailers.'.$name, []);
-        if (isset($mailer['url'])) {
-            $mailer = array_merge($mailer, (new ConfigurationUrlParser)->parseConfiguration($mailer));
-            $mailer['transport'] = $mailer['driver'] ?? null;
-        }
-        $transport = $mailer['transport'] ?? null;
-        if (in_array($transport, ['failover', 'roundrobin'], true) && ! empty($mailer['mailers'])) {
-            foreach ($mailer['mailers'] as $child) {
-                $this->ensureDeliveringMailer($child, [...$visited, $name]);
-            }
-
-            return;
-        }
-        if (in_array($transport, ['smtp', 'sendmail', 'ses', 'ses-v2', 'mailgun', 'postmark', 'resend'], true)
-            || ($transport === 'array' && app()->environment('testing'))) {
-            return;
-        }
-
-        throw new RuntimeException('Password delivery requires a non-logging mailer.');
     }
 }

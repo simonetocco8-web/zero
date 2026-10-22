@@ -2,6 +2,12 @@
 <nav class="mb-6 flex gap-5" aria-label="Accesso"><a class="inline-flex min-h-11 items-center underline" href="{{ route('login') }}">Accedi</a><span class="inline-flex min-h-11 items-center font-semibold" aria-current="page">Registrati</span></nav>
 <a class="inline-flex min-h-11 items-center underline" href="{{ route('customer.register') }}">Registrati come cliente</a>
 <h1>Registra la tua azienda</h1><p class="my-4 text-sm text-muted">Dopo la registrazione verificheremo il profilo della tua azienda.</p>
+@if($errors->has('company_exists'))
+<x-alert variant="danger" title="Azienda già registrata" class="mb-5">
+    <p>Questa Partita IVA risulta già associata a un'azienda registrata su ZeroMagazzino. Se l'azienda è la tua, accedi con le credenziali esistenti oppure recupera la password.</p>
+    <div class="mt-3 flex flex-wrap gap-3"><x-button variant="secondary" :href="route('login')">Accedi</x-button><x-button variant="secondary" :href="route('password.request')">Recupera password</x-button></div>
+</x-alert>
+@endif
 <form method="POST" action="{{ route('register') }}" class="space-y-5">@csrf
 <x-company-fields />
 <x-field name="email" label="Email account" type="email" required autocomplete="username" />

@@ -15,7 +15,7 @@
                         <td>{{ $data['category'] ?? '—' }}</td>
                         <td>{{ \App\Support\DisplayQuantity::format($data['quantity_milliunits']) }}</td>
                         <td class="whitespace-nowrap">{{ \App\Support\DisplayMoney::euros($data['zero_price_cents']) }}</td>
-                        <td><x-inventory-status :item="$item" /></td>
+                        <td><x-inventory-status-icon :item="$item" /></td>
                         <td class="whitespace-nowrap">{{ ($item->submitted_at ?? $item->created_at)->format('d/m/Y H:i') }}</td>
                         <td>
                             @if(in_array($item->status->value, ['pending', 'change_pending']))

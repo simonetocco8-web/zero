@@ -3,6 +3,9 @@
 <input type="hidden" name="confirmation_id" value="{{ $name }}">
 @if($decision)<input type="hidden" name="decision" value="{{ $decision }}">@endif
 <p>{{ $message }}</p>
+@if($hasErrors && ($errorKey ?? null) && $errors->has($errorKey))
+<x-alert variant="danger">{{ $errors->first($errorKey) }}</x-alert>
+@endif
 @if($reason)
 <div><label class="field-label" for="{{ $name }}-reason">Motivazione</label>
 <textarea class="field" id="{{ $name }}-reason" name="reason" required maxlength="1000" @if($hasErrors && $errors->has('reason')) aria-invalid="true" aria-describedby="{{ $name }}-reason-error" @endif>{{ $hasErrors ? old('reason') : '' }}</textarea>

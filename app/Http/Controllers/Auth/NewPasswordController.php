@@ -6,6 +6,7 @@ use App\Actions\Auth\ResetUserPassword;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Models\User;
+use App\Support\PasswordStatusMessage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -26,7 +27,7 @@ class NewPasswordController extends Controller
         );
 
         return $status === Password::PASSWORD_RESET
-            ? to_route('login')->with('status', __($status))
-            : back()->withInput($request->only('email'))->withErrors(['email' => __($status)]);
+            ? to_route('login')->with('status', PasswordStatusMessage::for($status))
+            : back()->withInput($request->only('email'))->withErrors(['email' => PasswordStatusMessage::for($status)]);
     }
 }
