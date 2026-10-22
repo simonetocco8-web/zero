@@ -12,7 +12,7 @@ $home=match($area){'admin'=>'admin.dashboard','retailer'=>'retailer.dashboard',d
 <!DOCTYPE html><html data-theme="light" lang="{{ str_replace('_','-',app()->getLocale()) }}"><head><x-head :title="$title" :canonical="url()->current()" robots="noindex,follow" /></head><body class="area-page"><x-theme-toggle />
 <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:bg-surface focus:p-3">Vai al contenuto</a>
 <div class="min-h-dvh lg:flex">
-    <aside class="management-sidebar hidden border-r border-line bg-brand-950 text-white lg:flex lg:w-64 lg:shrink-0 lg:flex-col">
+    <aside class="management-sidebar hidden border-r border-line bg-surface text-ink lg:flex lg:w-64 lg:shrink-0 lg:flex-col">
         <div class="sticky top-0 max-h-dvh overflow-y-auto p-5">
             <a href="{{ route($home) }}" class="mb-6 flex min-h-11 items-center"><x-brand /></a>
             <nav aria-label="Navigazione principale" class="space-y-2">

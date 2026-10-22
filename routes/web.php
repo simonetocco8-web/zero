@@ -97,6 +97,7 @@ Route::middleware(['auth', 'can:accessAdministration,'.User::class])->prefix('ad
     Route::get('dashboard', AdminDashboardController::class)->name('dashboard');
     Route::get('retailers', [AdminRetailerController::class, 'index'])->name('retailers');
     Route::patch('retailers/{retailer}/review', [AdminRetailerController::class, 'review'])->middleware('throttle:20,1')->name('retailers.review');
+    Route::post('retailers/{retailer}/reset-password', [AdminRetailerController::class, 'resetPassword'])->middleware('throttle:5,1')->name('retailers.reset-password');
     Route::get('stock', [AdminInventoryController::class, 'index'])->name('stock');
     Route::patch('stock/{item}/review', [AdminInventoryController::class, 'review'])->middleware('throttle:20,1')->name('stock.review');
     Route::get('payouts', [AdminPayoutController::class, 'index'])->name('payouts');
