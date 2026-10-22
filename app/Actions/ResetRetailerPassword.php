@@ -33,8 +33,11 @@ class ResetRetailerPassword
                     throw new RuntimeException('Invalid retailer account.');
                 }
                 do {
-                    $password = Str::password(24);
-                } while (! preg_match('/[a-z]/', $password) || ! preg_match('/[A-Z]/', $password));
+                    $password = $this->passwordCandidate();
+                } while (! preg_match('/[a-z]/', $password)
+                    || ! preg_match('/[A-Z]/', $password)
+                    || ! preg_match('/[0-9]/', $password)
+                    || ! preg_match('/[^a-zA-Z0-9]/', $password));
 
                 $user->forceFill(['password' => $password, 'remember_token' => null])->save();
                 app(RecordAdministrativeAction::class)->handle($actor, AdministrativeAction::RetailerPasswordReset, $retailer, ['password_reset' => false], ['password_reset' => true]);
@@ -48,6 +51,11 @@ class ResetRetailerPassword
                 'password_reset' => 'Impossibile completare il ripristino della password. La password precedente è stata conservata.',
             ]);
         }
+    }
+
+    protected function passwordCandidate(): string
+    {
+        return Str::password(24);
     }
 
     private function ensureDeliveringMailer(string $name, array $visited = []): void

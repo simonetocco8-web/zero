@@ -43,8 +43,9 @@ eseguite migration sui dati applicativi esistenti: solo database isolati di test
 POST `/admin/retailers/{retailer}/reset-password`: auth, gate amministrativo,
 policy `resetPassword`, CSRF e cinque tentativi al minuto per amministratore.
 La conferma espone l'indirizzo account destinatario. Il browser non sceglie la
-password. L'Action genera 24 caratteri con `Str::password`, richiede entrambe le
-casse e mantiene numeri/simboli garantiti dall'API. Usa il cast `hashed` di User
+password. L'Action genera 24 caratteri con `Str::password` e verifica
+esplicitamente almeno una minuscola, una maiuscola, un numero e un simbolo.
+Se una categoria manca, scarta il candidato e ripete la generazione. Usa il cast `hashed` di User
 e azzera `remember_token`. Lock su retailer e user; audit e aggiornamento sono
 nella medesima transazione, senza retry automatici della consegna esterna.
 
@@ -75,11 +76,11 @@ file d'ambiente o configurazione applicativa marketplace.
 
 - `composer validate --strict`: riuscito.
 - `vendor/bin/pint --test`: riuscito.
-- `php artisan test` (fixture numerica di processo): SQLite, 420 test passati,
-  27 saltati specifici MySQL, 2662 asserzioni.
+- `php artisan test` (fixture numerica di processo): SQLite, 421 test passati,
+  28 saltati specifici dei database reali, 2678 asserzioni.
 - Suite mirata MySQL 8.4.11 (`AdminRetailerPasswordResetTest`,
   `AdminTablesAndThemeTest`, `LoginMessagesTest`, `AdminPanelTest`,
-  `DomainModelTest`): 97 passati, 443 asserzioni.
+  `DomainModelTest`, `AdminAuditMigrationUpgradeTest`): 99 passati, 475 asserzioni.
 - Upgrade MySQL su DB nuovo con schema precedente: valore nuovo inizialmente
   non ammesso, ENUM esteso, audit preesistenti e trigger invariati, INSERT reset
   ammesso, UPDATE/DELETE ancora bloccati.
@@ -133,3 +134,71 @@ mailer fake e simulazione errore. Nessun merge o deployment effettuato.
 - `tests/Feature/AdminRetailerPasswordResetTest.php`
 - `tests/Feature/AdminTablesAndThemeTest.php`
 - `tests/Feature/Auth/LoginMessagesTest.php`
+
+## Revisione successiva — password e MariaDB 10.11.19
+
+Il controllo password verifica esplicitamente tutti e quattro i pattern, mantenendo
+24 caratteri. Il test deterministico sostituisce soltanto la sorgente dei candidati:
+fornisce quattro password da 24 caratteri prive rispettivamente di minuscole,
+maiuscole, numeri e simboli, poi una completa. Richiede esattamente cinque
+estrazioni e verifica che solo la quinta venga salvata (hashata) e inviata.
+Il test con generazione reale controlla inoltre la lunghezza esatta di 24 caratteri.
+
+Test eseguito su `10.11.19-MariaDB-ubu2204`, immagine ufficiale
+`mariadb:10.11.19`, digest
+`sha256:0d0945c57f75b3a3b9ebe71aedaaad005fa5305054e8fca3d2e42a8c92b43b5e`.
+Connessione Laravel `mysql` a un server MariaDB reale, con volume e database nuovi.
+Nessun dato applicativo esistente utilizzato o modificato.
+
+`AdminAuditMigrationUpgradeTest` ricrea le migration originali fino a
+`2026_10_06_000005_add_domain_constraints`: definiscono esattamente la tabella
+`audit_logs`, le dipendenze e i trigger presenti prima della nuova migration.
+Nessuna migration intermedia modifica tale schema audit. Non è una simulazione
+SQLite: il test viene eseguito su entrambi i motori reali, MySQL e MariaDB.
+
+Verifiche MariaDB riuscite (test upgrade dedicato: 1 test, 16 asserzioni):
+
+- tre audit preesistenti, confrontati integralmente prima/dopo;
+- ENUM originale esatto, senza `retailer_password_reset`, con inserimento nuovo
+  inizialmente rifiutato;
+- presenza dei trigger UPDATE e DELETE prima dell'upgrade;
+- esecuzione della migration originale del 22 ottobre, senza modificarla;
+- tutti gli indici conservati (nomi, colonne, unicità, tipo e proprietà);
+- trigger conservati (nomi, evento, timing, corpo e definer);
+- ENUM finale uguale all'originale più il solo valore aggiunto, nello stesso ordine;
+- inserimento del reset ammesso; UPDATE e DELETE raw ancora rifiutati;
+- nessuna rimozione o riscrittura dello storico.
+
+È emersa una limitazione preesistente della **catena completa da database vuoto**
+su MariaDB: `2026_10_16_000005_add_retailer_credit_funding` usa `DROP CHECK`,
+sintassi MySQL che MariaDB 10.11 non accetta. I primi tentativi della suite ampia
+si sono fermati durante quel setup, prima di testare la migration audit.
+Quella migration economica non è stata modificata in questa revisione.
+
+Per completare anche i test applicativi MariaDB, è stato ripristinato in un altro
+DB nuovo uno snapshot SQL delle sole fixture MySQL (schema, trigger e dati di
+bootstrap, inclusa la cronologia migration), senza modifiche al dump. Su questo
+schema la suite mirata composta da `AdminAuditMigrationUpgradeTest`,
+`AdminRetailerPasswordResetTest`, `AdminTablesAndThemeTest`, `LoginMessagesTest`,
+`AdminPanelTest` e `DomainModelTest` passa: **99 test, 475 asserzioni**.
+Il test upgrade della stessa suite usa comunque un ulteriore DB separato e
+ricostruisce da zero lo schema audit originale sopra descritto. Questi risultati
+non certificano che l'intera catena di migration storiche sia compatibile MariaDB.
+
+Sono stati rieseguiti con successo Composer strict, Pint, suite completa SQLite
+(421 passati, 28 saltati, 2678 asserzioni), suite mirata MySQL 8.4.11 (99 passati,
+475 asserzioni), build Vite e `git diff --check`.
+
+Il finding che propone card mobile è stato discusso e risolto nella PR #15:
+il requisito funzionale esplicito impone tabelle anche su mobile, con scroll
+orizzontale interno e nessun overflow pagina, e prevale sulla raccomandazione
+generica in AGENTS.md. Nessuna view, tabella o regola CSS è stata modificata qui.
+
+All'inizio della revisione la PR #15 risultava già merged da GitHub, con merge
+commit `a7faf4c64696dcab774445cbe297919a46979b09`. L'utente ha autorizzato una nuova
+PR dallo stesso branch per queste correzioni. Questa revisione non esegue merge.
+
+File di questa revisione: `app/Actions/ResetRetailerPassword.php`,
+`tests/Feature/AdminRetailerPasswordResetTest.php`,
+`tests/Feature/AdminAuditMigrationUpgradeTest.php` (nuovo),
+`docs/admin-tables-password-reset-theme.md`.
