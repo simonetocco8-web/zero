@@ -146,6 +146,7 @@ class AdminRetailerPasswordResetTest extends TestCase
 
     public function test_mail_failure_rolls_back_hash_remember_token_and_audit_without_logging(): void
     {
+        config(['mail.default' => 'smtp']);
         $original = $this->retailer->user->only('password', 'remember_token');
         Log::spy();
         Mail::shouldReceive('to')->once()->with($this->retailer->user->email)->andReturnSelf();
@@ -193,6 +194,30 @@ class AdminRetailerPasswordResetTest extends TestCase
         $this->assertSame($original, $this->retailer->user->fresh()->password);
         $this->assertDatabaseCount('audit_logs', 0);
         Mail::assertNothingSent();
+    }
+
+    public function test_non_delivering_mailer_reopens_the_selected_confirmation_with_specific_error(): void
+    {
+        config(['mail.default' => 'log']);
+        Mail::fake();
+        Log::spy();
+        $original = $this->retailer->user->only('password', 'remember_token');
+        $id = 'retailer-reset-password-'.$this->retailer->id;
+        $this->actingAs($this->admin)->from(route('admin.retailers'))->post($this->url(), ['confirmation_id' => $id])
+            ->assertRedirect(route('admin.retailers'))
+            ->assertSessionHasErrors(['password_reset' => 'Invio email non configurato sul server. La password non è stata modificata.']);
+        $html = $this->withCookie(config('session.cookie'), session()->getId())->get(route('admin.retailers'))->assertOk()->getContent();
+        $dom = new \DOMDocument;
+        @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+        $xpath = new \DOMXPath($dom);
+        $dialog = $xpath->query('//dialog[@aria-labelledby="'.$id.'-title"]')->item(0);
+        $this->assertStringContainsString('Invio email non configurato sul server. La password non è stata modificata.', $dialog->textContent);
+        $this->assertSame('open()', $dialog->getAttribute('x-init'));
+        $this->assertSame($original, $this->retailer->user->fresh()->only('password', 'remember_token'));
+        $this->assertDatabaseCount('audit_logs', 0);
+        Mail::assertNothingSent();
+        Log::shouldNotHaveReceived('error');
+        Log::shouldNotHaveReceived('debug');
     }
 
     public function test_endpoint_is_limited_to_five_attempts_per_minute(): void

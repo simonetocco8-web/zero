@@ -1,6 +1,13 @@
 @props(['name' => 'box'])
 @php
 $paths = [
+    'document' => 'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6',
+    'clock' => 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 M12 7v5l3 2',
+    'check-circle' => 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 m-13 0 3 3 5-6',
+    'x-circle' => 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 M9 9l6 6 M15 9l-6 6',
+    'refresh' => 'M20 7v5h-5 M4 17v-5h5 M5 8a8 8 0 0 1 14-2l1 6 M4 12l1 6a8 8 0 0 0 14-2',
+    'archive' => 'M3 3h18v5H3z M5 8v13h14V8 M10 12h4',
+
     'eye' => 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12 M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
     'building' => 'M4 21V7l8-4 8 4v14 M2 21h20 M8 9h1 M15 9h1 M8 13h1 M15 13h1 M10 21v-4h4v4',
     'bricks' => 'M3 4h18v16H3z M3 9h18 M3 15h18 M12 4v5 M8 9v6 M16 9v6 M12 15v5',
