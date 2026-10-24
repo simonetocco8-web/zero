@@ -1,5 +1,10 @@
 # Aree riservate marketplace
 
+## EXISTING — pagamento ordini simulato
+
+La pagina ordine consente ora di completare un pagamento fake tramite POST protetta e servizio interno esistente, esclusivamente in modalità simulation: [contratto e verifiche](marketplace-order-simulation.md). Nessun addebito reale o modifica al dominio economico.
+
+
 > Riallineamento successivo: [audit economico marketplace](marketplace-payments.md) e [ADR funds flow](adr/marketplace-funds-flow.md) prevalgono sui limiti storici qui descritti (fee scambio, TTL, trasporto e rimborso senza restock). I risultati di verifica riportati sotto descrivono la fase precedente.
 
 ## EXISTING

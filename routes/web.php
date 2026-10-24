@@ -146,6 +146,7 @@ Route::middleware(['auth', 'can:purchase,'.User::class])->group(function () {
     Route::get('ordini/{order}', [MarketplaceOrderController::class, 'show'])->name('orders.show');
     Route::post('ordini/{order}/annulla', [MarketplaceOrderController::class, 'cancel'])->middleware('throttle:10,1')->name('orders.cancel');
     Route::post('ordini/{order}/simulazione', [MarketplaceOrderController::class, 'retry'])->middleware([EnsureMarketplaceAccess::class, 'throttle:10,1'])->name('orders.payment-retry');
+    Route::post('ordini/{order}/simula-pagamento', [MarketplaceOrderController::class, 'simulatePayment'])->middleware([EnsureMarketplaceAccess::class, 'throttle:10,1'])->name('orders.payment-simulate');
 });
 require __DIR__.'/auth.php';
 

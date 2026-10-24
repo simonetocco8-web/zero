@@ -40,10 +40,17 @@
         @if($order->payment?->provider === 'stripe_connect' && $order->payment?->checkout_url)
             <x-button class="mt-5" :href="$order->payment->checkout_url">Paga con carta su Stripe</x-button>
         @endif
-        @if(!$order->payment?->reference)
+        @if($order->payment && $order->payment->reference === null)
             <form class="mt-5" method="POST" action="{{ route('orders.payment-retry',$order) }}">
                 @csrf
                 <x-button type="submit">Riprova avvio pagamento</x-button>
+            </form>
+        @endif
+        @if(config('marketplace.economic_rules.execution_mode') === 'simulation' && $order->payment?->provider === 'fake_marketplace' && $order->payment->simulated && filled($order->payment->reference) && !$order->totals_provisional && $order->payment->status === 'payment_pending')
+            <form class="mt-5" method="POST" action="{{ route('orders.payment-simulate',$order) }}">
+                @csrf
+                <p class="mb-3 text-sm text-muted">Modalità simulazione: nessun addebito reale verrà effettuato.</p>
+                <x-button type="submit">Simula pagamento riuscito</x-button>
             </form>
         @endif
         <form method="POST" action="{{ route('orders.cancel',$order) }}" class="mt-5">
