@@ -1,5 +1,10 @@
 # UI e UX
 
+## EXISTING — IVA vendite configurabile, 24 ottobre 2026
+
+Aliquote esplicite per merce e spedizione, moderazione, snapshot immutabili e checkout fail-safe: [contratto IVA marketplace](marketplace-vat.md). Questa implementazione supera le descrizioni storiche di IVA meramente descrittiva e spedizione sempre irrisolta per le vendite; commissioni e flussi economici restano invariati.
+
+
 ## Refresh coordinato navy/aqua — 19 ottobre 2026
 
 EXISTING: tema scuro centralizzato in `resources/css/app.css`, applicato a layout, accesso/registrazione, dashboard, catalogo, card, badge, form, notifiche e dialog. I token `canvas`, `surface`, `raised`, `line`, `control`, `ink` e `muted` separano le superfici dal testo; aqua identifica CTA e focus, con testo navy sui pulsanti pieni. Stati di errore/successo mantengono etichette e colori distinti. Nessun font remoto, framework o dipendenza applicativa aggiunti.

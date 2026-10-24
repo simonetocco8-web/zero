@@ -47,7 +47,7 @@ return [
     'exchange_difference_payment_minutes' => $integer('EXCHANGE_DIFFERENCE_PAYMENT_MINUTES', 1440),
     'exchange_proposal_hours' => $integer('MARKETPLACE_EXCHANGE_PROPOSAL_HOURS', 48),
     'notifications' => ['channels' => ['database', 'mail'], 'queue_connection' => env('MARKETPLACE_NOTIFICATION_QUEUE_CONNECTION', 'database'), 'queue' => 'marketplace-notifications'],
-    // Presentation and explicitly supplied tax inputs; no default VAT rate.
+    // Legacy exchange inputs only; sales use explicit per-product rates. No default VAT rate.
     'tax_rates_basis_points' => [],
     'featured_item_ids' => [],
     'vat_treatments' => ['included' => 'IVA inclusa', 'excluded' => 'IVA esclusa', 'not_applicable' => 'IVA non applicabile'],

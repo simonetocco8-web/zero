@@ -1,5 +1,10 @@
 # Architettura — audit e marketplace pianificato
 
+## EXISTING — IVA vendite configurabile, 24 ottobre 2026
+
+Aliquote esplicite per merce e spedizione, moderazione, snapshot immutabili e checkout fail-safe: [contratto IVA marketplace](marketplace-vat.md). Questa implementazione supera le descrizioni storiche di IVA meramente descrittiva e spedizione sempre irrisolta per le vendite; commissioni e flussi economici restano invariati.
+
+
 ## Aggiornamento approvato — 18 ottobre 2026
 
 Marketplace riservato agli utenti autenticati (rivendite approved), homepage ospiti con accesso/registrazione; eliminazione recuperabile articoli owner/admin, gestione foto con moderazione e quantità senza zeri decimali superflui. Questo aggiornamento supera le descrizioni storiche del catalogo pubblico. Contratti e migration in [inventory-access.md](inventory-access.md).

@@ -226,7 +226,7 @@ class MarketplaceCartOrderTest extends TestCase
     {
         config(['marketplace.tax_rates_basis_points' => ['included' => 2200, 'excluded' => 2200]]);
         $u = $this->buyer();
-        $p = $this->product(['vat_treatment' => 'included', 'zero_price_cents' => 1220]);
+        $p = $this->product(['vat_treatment' => 'included', 'vat_rate_basis_points' => 2200, 'zero_price_cents' => 1220]);
         app(MarketplaceCart::class)->save($u, $p, '1', 'pickup');
         $order = $this->create($u);
         $this->assertSame(1000, $order->taxable_cents);

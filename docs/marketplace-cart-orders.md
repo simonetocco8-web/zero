@@ -1,5 +1,10 @@
 # Carrello e ordini marketplace — 13 ottobre 2026
 
+## Aggiornamento IVA — 24 ottobre 2026
+
+Vendite con trattamento e aliquota espliciti per prodotto e spedizione: vedere [marketplace-vat.md](marketplace-vat.md). Le sezioni storiche su aliquote globali e trasporto sempre provvisorio sono superate. Ordini storici conservati; nessun incasso reale.
+
+
 > Aggiornamento 16 ottobre 2026: il PDF pagamenti v1.0 e [marketplace-payments.md](marketplace-payments.md) prevalgono sui valori di sviluppo sotto. Checkout 30m, conguaglio 1440m, proposta 48h; conguaglio calcolato solo sui totali merce. Adapter Connect ora disponibile ma disabilitato per default; il credito retailer maturato è spendibile anche con carta secondo la successiva istruzione vincolante del committente; il bonus customer è separato. Nessun incasso live eseguito.
 
 > Riallineamento successivo: [audit economico marketplace](marketplace-payments.md) e [ADR funds flow](adr/marketplace-funds-flow.md) prevalgono sui limiti storici qui descritti (fee scambio, TTL, trasporto e rimborso senza restock). I risultati di verifica riportati sotto descrivono la fase precedente.

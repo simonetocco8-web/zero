@@ -147,11 +147,11 @@ class MarketplaceFoundationsTest extends TestCase
         $this->assertSame(1200, $i->zero_price_cents);
         $this->assertSame('kg', $i->unit);
         $this->assertSame('Solo lunedì', $i->delivery_notes);
-        $this->assertSame('IVA esclusa', $i->vatLabel());
+        $this->assertSame('IVA esclusa · IVA da definire', $i->vatLabel());
         $this->get(route('retailer.stock.show', $i))->assertOk()->assertSee('IVA esclusa')->assertSee('12,34');
         $this->put(route('retailer.stock.update', $i), $this->product(['shipping_cost' => '0', 'vat_treatment' => null]))->assertSessionHasNoErrors();
         $this->assertSame(0, $i->fresh()->shipping_cost_cents);
-        $this->assertSame('Trattamento IVA da definire', $i->fresh()->vatLabel());
+        $this->assertSame('IVA da definire', $i->fresh()->vatLabel());
     }
 
     public function test_shipping_cost_rejects_negative_precision_and_float_inputs(): void
@@ -188,7 +188,7 @@ class MarketplaceFoundationsTest extends TestCase
         config(['marketplace.vat_treatments.custom' => 'Regime da concordare']);
         $r = $this->retailer();
         $this->actingAs($r->user)->post(route('retailer.stock.store'), $this->product(['vat_treatment' => 'custom']))->assertSessionHasNoErrors();
-        $this->assertSame('Regime da concordare', InventoryItem::sole()->vatLabel());
+        $this->assertSame('Regime da concordare · IVA da definire', InventoryItem::sole()->vatLabel());
         $this->assertSame(1200, InventoryItem::sole()->zero_price_cents);
     }
 

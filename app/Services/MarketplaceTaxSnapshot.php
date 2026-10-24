@@ -12,11 +12,16 @@ class MarketplaceTaxSnapshot
 {
     public function goods(int $amount, ?string $treatment, string $description): array
     {
-        $rate = config('marketplace.tax_rates_basis_points.'.$treatment);
+        // Legacy exchange configuration; marketplace sales always use explicit product inputs.
+        return $this->amount($amount, $treatment, config('marketplace.tax_rates_basis_points.'.$treatment), $description);
+    }
+
+    public function amount(int $amount, ?string $treatment, mixed $rate, string $description): array
+    {
         $base = null;
         $tax = null;
         $gross = null;
-        if ($treatment === 'not_applicable') {
+        if ($treatment === 'not_applicable' && ($rate === null || $rate === 0)) {
             $rate = 0;
             $base = $amount;
             $tax = 0;

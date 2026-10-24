@@ -17,6 +17,16 @@ class InventoryRules
     public function data(array $input): array
     {
         $data = Arr::only($input, ['name', 'brand', 'sku', 'ean', 'condition', 'province', 'description', 'delivery_notes', 'vat_treatment']);
+        foreach (['', 'shipping_'] as $prefix) {
+            $treatment = $input[$prefix.'vat_treatment'] ?? null;
+            $data[$prefix.'vat_treatment'] = $treatment === '' ? null : $treatment;
+            $value = $input[$prefix.'vat_rate'] ?? null;
+            if ($value !== null && $value !== '' && ((! is_string($value) && ! is_int($value)) || ! preg_match('/^[0-9]{1,3}(?:[.,][0-9]{1,2})?$/D', (string) $value))) {
+                $this->fail($prefix.'vat_rate', 'Inserisci un’aliquota tra 0 e 100 con al massimo due decimali.');
+            }
+            $data[$prefix.'vat_rate_basis_points'] = $value === null || $value === '' ? null : BigDecimal::of(str_replace(',', '.', (string) $value))->multipliedBy(100)->toBigInteger()->toInt();
+        }
+        $this->validateVat($data);
         $category = Category::findOrFail($input['category_id']);
         $data['category_id'] = $category->id;
         $data['category'] = $category->name; // Legacy snapshot, retained for compatibility.
@@ -60,9 +70,7 @@ class InventoryRules
         if (isset($data['shipping_cost_cents']) && ExactInteger::parse($data['shipping_cost_cents']) < 0) {
             $this->fail('shipping_cost', 'Il costo deve essere non negativo.');
         }
-        if (isset($data['vat_treatment']) && ! array_key_exists($data['vat_treatment'], config('marketplace.vat_treatments'))) {
-            $this->fail('vat_treatment', 'Trattamento IVA non configurato.');
-        }
+        $this->validateVat($data);
         $subscription = $retailer->activeSubscription()->with('plan')->lockForUpdate()->first();
         if (! $subscription || ($subscription->ends_at && $subscription->ends_at <= now()) || ($subscription->starts_at && $subscription->starts_at > now())) {
             $this->fail('plan', 'È necessario un piano attivo per gestire le giacenze.');
@@ -103,6 +111,23 @@ class InventoryRules
     private function value(array $data): BigInteger
     {
         return BigInteger::of($data['quantity_milliunits'])->multipliedBy($data['zero_price_cents']);
+    }
+
+    private function validateVat(array $data): void
+    {
+        foreach (['', 'shipping_'] as $prefix) {
+            $treatment = $data[$prefix.'vat_treatment'] ?? null;
+            $rate = $data[$prefix.'vat_rate_basis_points'] ?? null;
+            if ($treatment !== null && (! is_string($treatment) || ! array_key_exists($treatment, config('marketplace.vat_treatments')))) {
+                $this->fail($prefix.'vat_treatment', 'Trattamento IVA non configurato.');
+            }
+            if ($rate !== null && (! is_int($rate) || $rate < 0 || $rate > 10000)) {
+                $this->fail($prefix.'vat_rate', 'Inserisci un’aliquota tra 0 e 100 con al massimo due decimali.');
+            }
+            if ($rate !== null && ($treatment === null || ($treatment === 'not_applicable' && $rate !== 0))) {
+                $this->fail($prefix.'vat_rate', 'L’aliquota richiede un trattamento IVA coerente. Per IVA non applicabile lascia vuoto o indica zero.');
+            }
+        }
     }
 
     private function fail(string $field, string $message): never

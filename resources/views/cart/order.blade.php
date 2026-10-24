@@ -7,6 +7,7 @@
     @if(session('status'))
         <x-alert>{{ session('status') }}</x-alert>
     @endif
+    @if($order->totals_provisional)<x-alert title="IVA da definire">Totali provvisori: l’ordine resta in attesa senza incasso.</x-alert>@endif
     <div class="mt-5 grid gap-4 lg:grid-cols-2">
         @foreach($order->vendorOrders as $vendor)
             <x-card>
@@ -17,6 +18,7 @@
                         <strong>{{ $line->name }}</strong>
                         <p>SKU: {{ $line->sku ?: '—' }} · {{ \App\Support\DisplayQuantity::format($line->quantity_milliunits) }} {{ $line->unit }} × {{ \App\Support\DisplayMoney::euros($line->unit_price_cents) }}</p>
                         <p>{{ $line->tax_snapshot['description'] }}</p>
+                        <x-line-tax-breakdown :line="$line" />
                     </div>
                 @endforeach
                 @if($vendor->address_snapshot)
