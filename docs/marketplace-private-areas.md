@@ -1,5 +1,10 @@
 # Aree riservate marketplace
 
+## EXISTING — dettaglio vendita operativo
+
+Testata di stato, avanzamento, prossima azione, prodotti/consegna e riepilogo separati: [UX del dettaglio vendita](vendor-order-detail-ux.md). Intervento di sola presentazione, con form e componenti condivisi conservati.
+
+
 ## EXISTING — pagamento ordini simulato
 
 La pagina ordine consente ora di completare un pagamento fake tramite POST protetta e servizio interno esistente, esclusivamente in modalità simulation: [contratto e verifiche](marketplace-order-simulation.md). Nessun addebito reale o modifica al dominio economico.
