@@ -7,7 +7,9 @@ use App\Casts\ExactIntegerCast;
 use App\Enums\InventoryCondition;
 use App\Enums\InventoryStatus;
 use App\Models\Concerns\HasExactQuantity;
+use App\Services\MarketplaceTaxSnapshot;
 use App\Services\StockReservations;
+use App\Support\DisplayMoney;
 use App\Support\MoneyMath;
 use Brick\Math\BigDecimal;
 use Database\Factories\InventoryItemFactory;
@@ -29,13 +31,15 @@ class InventoryItem extends Model
 
     protected $attributes = ['status' => 'draft', 'condition' => 'new', 'unit' => 'piece', 'currency' => 'EUR', 'pickup_available' => false, 'shipping_available' => false, 'exchange_available' => false];
 
-    protected $fillable = ['category_id', 'shipping_cost_cents', 'delivery_notes', 'vat_treatment', 'retailer_id', 'name', 'brand', 'category', 'sku', 'ean', 'quantity', 'quantity_milliunits', 'unit', 'currency', 'list_price_cents', 'zero_price_cents', 'condition', 'province', 'pickup_available', 'shipping_available', 'exchange_available', 'description', 'status', 'reviewed_by', 'rejection_reason', 'published_at', 'external_provider', 'external_product_id'];
+    protected $fillable = ['category_id', 'shipping_cost_cents', 'delivery_notes', 'vat_treatment', 'vat_rate_basis_points', 'shipping_vat_treatment', 'shipping_vat_rate_basis_points', 'retailer_id', 'name', 'brand', 'category', 'sku', 'ean', 'quantity', 'quantity_milliunits', 'unit', 'currency', 'list_price_cents', 'zero_price_cents', 'condition', 'province', 'pickup_available', 'shipping_available', 'exchange_available', 'description', 'status', 'reviewed_by', 'rejection_reason', 'published_at', 'external_provider', 'external_product_id'];
 
     protected function casts(): array
     {
         return [
             'proposed_data' => 'array', 'proposed_images' => 'array',
             'stock_version' => 'integer', 'proposed_stock_version' => 'integer',
+            'vat_rate_basis_points' => ExactIntegerCast::class,
+            'shipping_vat_rate_basis_points' => ExactIntegerCast::class,
             'category_id' => ExactIntegerCast::class,
             'shipping_cost_cents' => ExactIntegerCast::class,
             'quantity_milliunits' => ExactIntegerCast::class,
@@ -77,7 +81,39 @@ class InventoryItem extends Model
 
     public function vatLabel(): string
     {
-        return config('marketplace.vat_treatments.'.$this->vat_treatment) ?? 'Trattamento IVA da definire';
+        return $this->taxLabel($this->vat_treatment, $this->vat_rate_basis_points);
+    }
+
+    public function shippingVatLabel(): string
+    {
+        return $this->taxLabel($this->shipping_vat_treatment, $this->shipping_vat_rate_basis_points);
+    }
+
+    public function shippingCostLabel(): string
+    {
+        if ($this->shipping_cost_cents === null) {
+            return 'Costo da definire';
+        }
+        if ($this->shipping_cost_cents === 0) {
+            return 'Gratuita';
+        }
+        $tax = app(MarketplaceTaxSnapshot::class)->amount($this->shipping_cost_cents, $this->shipping_vat_treatment, $this->shipping_vat_rate_basis_points, 'Spedizione');
+        if ($tax['provisional']) {
+            return DisplayMoney::euros($this->shipping_cost_cents).' · IVA da definire';
+        }
+
+        return DisplayMoney::euros($tax['gross_cents']).($this->shipping_vat_treatment === 'not_applicable' ? ' · IVA non applicabile' : ' · IVA inclusa');
+    }
+
+    private function taxLabel(?string $treatment, ?int $rate): string
+    {
+        $label = config('marketplace.vat_treatments.'.$treatment);
+        $fiscal = app(MarketplaceTaxSnapshot::class)->amount(0, $treatment, $rate, $label ?? 'IVA da definire');
+        if ($fiscal['provisional']) {
+            return ($label ? $label.' · ' : '').'IVA da definire';
+        }
+
+        return $label.($treatment === 'not_applicable' ? '' : ' · '.DisplayMoney::percent($rate));
     }
 
     public function retailer(): BelongsTo

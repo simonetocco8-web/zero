@@ -66,15 +66,20 @@ class MarketplaceQuote
             $gross = MoneyMath::lineTotalCents($p->zero_price_cents, $item->quantity_milliunits);
             $cost = $mode === 'shipping' ? $p->shipping_cost_cents : 0;
             $treatment = $p->vat_treatment;
-            $fiscal = app(MarketplaceTaxSnapshot::class)->goods($gross, $treatment, $p->vatLabel());
-            $rate = $fiscal['rate_basis_points'];
-            $tax = $fiscal['tax_cents'];
+            $taxes = app(MarketplaceTaxSnapshot::class);
+            $fiscal = $taxes->amount($gross, $treatment, $p->vat_rate_basis_points, $p->vatLabel());
+            $shippingFiscal = $cost === 0
+                ? $taxes->amount(0, 'not_applicable', null, $mode === 'pickup' ? 'Ritiro senza trasporto' : 'Spedizione gratuita')
+                : $taxes->amount($cost, $p->shipping_vat_treatment, $p->shipping_vat_rate_basis_points, config('marketplace.vat_treatments.'.$p->shipping_vat_treatment) ?? 'IVA da definire');
+            $shippingFiscal['input_amount_cents'] = $cost;
+            $cost = $shippingFiscal['gross_cents'] ?? $cost;
             $base = $fiscal['taxable_cents'];
+            $tax = $fiscal['tax_cents'] === null || $shippingFiscal['tax_cents'] === null ? null : BigInteger::of($fiscal['tax_cents'])->plus($shippingFiscal['tax_cents'])->toInt();
+            $taxable = $base === null || $shippingFiscal['taxable_cents'] === null ? null : BigInteger::of($base)->plus($shippingFiscal['taxable_cents'])->toInt();
             $due = $fiscal['gross_cents'] ?? $gross;
             $commissionRate = app(MarketplaceCommission::class)->saleRate($plan->code);
-            // Shipping tax has no approved fiscal rule: nonzero shipping keeps fiscal totals provisional.
-            $uncertain = $tax === null || $cost > 0;
-            $line = ['inventory_item_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit' => $p->unit, 'unit_price_cents' => $p->zero_price_cents, 'quantity_milliunits' => $item->quantity_milliunits, 'subtotal_cents' => $gross, 'shipping_cost_cents' => $cost, 'tax_cents' => $tax, 'taxable_cents' => $base, 'total_cents' => BigInteger::of($due)->plus($cost)->toInt(), 'commission_basis_points' => $commissionRate, 'commission_cents' => $uncertain ? null : MoneyMath::commissionCents($base, $commissionRate), 'tax_snapshot' => array_replace($fiscal, ['provisional' => $uncertain]) + ['issuer_retailer_id' => $p->retailer_id, 'shipping_tax' => 'unresolved', 'provisional' => $uncertain], 'product_snapshot' => ['brand' => $p->brand, 'ean' => $p->ean, 'category' => $p->categoryRecord?->name ?? $p->category, 'retailer_name' => $p->retailer->company_name, 'delivery_notes' => $p->delivery_notes, 'available_quantity_milliunits' => app(StockReservations::class)->available($p), 'pickup_available' => $p->pickup_available, 'shipping_available' => $p->shipping_available]];
+            $uncertain = $fiscal['provisional'] || $shippingFiscal['provisional'];
+            $line = ['inventory_item_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit' => $p->unit, 'unit_price_cents' => $p->zero_price_cents, 'quantity_milliunits' => $item->quantity_milliunits, 'subtotal_cents' => $gross, 'shipping_cost_cents' => $cost, 'tax_cents' => $tax, 'taxable_cents' => $taxable, 'total_cents' => BigInteger::of($due)->plus($cost)->toInt(), 'commission_basis_points' => $commissionRate, 'commission_cents' => $uncertain ? null : MoneyMath::commissionCents($base, $commissionRate), 'tax_snapshot' => array_replace($fiscal, ['provisional' => $uncertain]) + ['policy' => 'explicit_product_vat_v1', 'input_amount_cents' => $gross, 'issuer_retailer_id' => $p->retailer_id, 'shipping_tax' => $shippingFiscal, 'commission_base_cents' => $base], 'product_snapshot' => ['brand' => $p->brand, 'ean' => $p->ean, 'category' => $p->categoryRecord?->name ?? $p->category, 'retailer_name' => $p->retailer->company_name, 'delivery_notes' => $p->delivery_notes, 'available_quantity_milliunits' => app(StockReservations::class)->available($p), 'pickup_available' => $p->pickup_available, 'shipping_available' => $p->shipping_available]];
             if (! isset($groups[$p->retailer_id])) {
                 $groups[$p->retailer_id] = ['retailer_id' => $p->retailer_id, 'retailer_snapshot' => ['seller_role' => 'merchandise_seller', 'id' => $p->retailer_id, 'name' => $p->retailer->company_name, 'vat_number' => $p->retailer->vat_number, 'city' => $p->retailer->city], 'delivery_mode' => $mode, 'address_snapshot' => $mode === 'shipping' ? $address->only(['recipient_name', 'company', 'address_line_1', 'address_line_2', 'postal_code', 'city', 'province', 'country_code', 'phone']) : null, 'items' => [], 'subtotal_cents' => 0, 'shipping_cents' => 0, 'tax_cents' => 0, 'taxable_cents' => 0, 'total_cents' => 0, 'totals_provisional' => false, 'funds_flow_snapshot' => ['policy' => 'approved_sales_v1', 'merchandise_seller_id' => $p->retailer_id, 'commission_basis_points' => $commissionRate, 'commission_base' => 'taxable_goods_excluding_shipping_existing_convention', 'commission_tax' => ['issuer' => 'ZeroMagazzino', 'recipient_retailer_id' => $p->retailer_id, 'rate_basis_points' => null, 'tax_cents' => null, 'gross_cents' => null], 'shipping_payer' => 'buyer', 'psp_cost_cents' => null]];
             }
@@ -83,7 +88,7 @@ class MarketplaceQuote
             }
             $g = &$groups[$p->retailer_id];
             $g['items'][] = $line;
-            foreach (['subtotal_cents' => $gross, 'shipping_cents' => $cost, 'tax_cents' => $tax, 'taxable_cents' => $base, 'total_cents' => $line['total_cents']] as $key => $amount) {
+            foreach (['subtotal_cents' => $gross, 'shipping_cents' => $cost, 'tax_cents' => $tax, 'taxable_cents' => $taxable, 'total_cents' => $line['total_cents']] as $key => $amount) {
                 $g[$key] = $amount === null || $g[$key] === null ? null : BigInteger::of($g[$key])->plus($amount)->toInt();
             }$g['totals_provisional'] = $g['totals_provisional'] || $uncertain;
             unset($g);
@@ -92,14 +97,16 @@ class MarketplaceQuote
             $shipping = $shipping->plus($cost);
             if ($tax !== null) {
                 $allTax = $allTax->plus($tax);
-            }if ($base !== null) {
-                $allBase = $allBase->plus($base);
+            }if ($taxable !== null) {
+                $allBase = $allBase->plus($taxable);
             }$provisional = $provisional || $uncertain;
         }
 
         foreach ($groups as &$group) {
             $fees = collect($group['items'])->pluck('commission_cents');
-            $feeTotal = $fees->contains(null) ? null : BigInteger::sum(...$fees->all())->toInt();
+            $feeTotal = $fees->containsStrict(null) ? null : BigInteger::sum(...$fees->all())->toInt();
+            $bases = collect($group['items'])->map(fn ($line) => $line['tax_snapshot']['commission_base_cents']);
+            $group['funds_flow_snapshot']['commission_base_cents'] = $bases->containsStrict(null) ? null : BigInteger::sum(...$bases->all())->toInt();
             $group['funds_flow_snapshot']['commission_tax'] = $feeTotal === null ? $group['funds_flow_snapshot']['commission_tax'] : app(MarketplaceCommission::class)->serviceTax($feeTotal, $group['retailer_id']);
             $group['funds_flow_snapshot']['recipient_stripe_account_id'] = DB::table('marketplace_connected_accounts')->where('retailer_id', $group['retailer_id'])->value('stripe_account_id');
             $group['funds_flow_snapshot']['funds_flow'] = config('marketplace.economic_rules.funds_flow');

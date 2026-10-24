@@ -58,8 +58,12 @@ class AdminTablesAndThemeTest extends TestCase
         $this->assertStringNotContainsString('Descrizione', $row);
         $this->assertStringNotContainsString('Gestisci foto', $row);
         $this->assertStringNotContainsString('Elimina articolo', $row);
-        $this->assertStringContainsString('APPROVA E PUBBLICA', $row);
-        $this->assertStringContainsString('RIFIUTA', $row);
+        foreach (['APPROVA E PUBBLICA', 'RIFIUTA'] as $label) {
+            $button = $xpath->query('//table//button[@aria-label="'.$label.'"]')->item(0);
+            $this->assertNotNull($button);
+            $this->assertSame('', trim($button->textContent));
+            $this->assertSame(1, $xpath->query('.//svg', $button)->length);
+        }
         $this->assertSame(1, $xpath->query('//table//button[@aria-label="Dettaglio giacenza #'.$item->id.'"]')->length);
         $modal = $xpath->query('//dialog[@aria-labelledby="stock-detail-'.$item->id.'-title"]')->item(0)->textContent;
         foreach ([$data['description'], 'Consegna proposta', 'SKU-PROPOSTO', 'Foto presenti: 1', 'Gestisci foto', 'Elimina articolo'] as $value) {

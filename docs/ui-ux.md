@@ -1,5 +1,21 @@
 # UI e UX
 
+## Interfaccia marketplace, ordini e stock — 24 ottobre 2026
+
+EXISTING: la top bar mostra «Vai a Marketplace» e icone per carrello, ordini e area personale; il menu Categorie è rimosso dalla barra, mentre categorie e filtri del catalogo restano disponibili. I badge, omessi quando zero, contano i prodotti distinti nel carrello e tutti gli ordini padre dell’utente autenticato. Un’unica query con conteggi separati conserva isolamento e numero costante di query.
+
+Nella selezione Consegna di acquisto e carrello, la voce Spedizione include costo e stato IVA; usa il lordo quando determinato, «Gratuita» per costo zero e «Costo da definire» per costo assente. Non cambia il calcolo economico del checkout. La prenotazione ordine usa il formato giorno/mese/anno. La lista ordini è tabellare con ID, Data Ordine, Rivenditore (anche più venditori, dai nomi storici), Totale, Status e icona dettaglio; su mobile la sola regione della tabella scorre orizzontalmente. Sottoordini caricati in eager loading, lettura limitata ai propri ordini e filtri/paginazione conservati.
+
+Stock admin: approvazione e rifiuto hanno icone distinte. Lista stock retailer: stato e azioni hanno icone, con tooltip/nomi accessibili, controlli interattivi da almeno 44 px e conferme/policy esistenti. I box Vendite hanno icone rappresentative. Conferme di rifiuto ed eliminazione conservate anche da tastiera.
+
+Verifiche: suite SQLite completa 484 passati e 28 saltati; 13 test mirati MySQL passati; Pint e build Vite superati. Sei schermate verificate in Chromium a 320/375/768/1280 px, senza overflow della pagina o errori JavaScript; apertura delle conferme tramite le nuove icone, incluso Enter/Escape per eliminazione. Non è una certificazione di accessibilità completa.
+
+
+## EXISTING — IVA vendite configurabile, 24 ottobre 2026
+
+Aliquote esplicite per merce e spedizione, moderazione, snapshot immutabili e checkout fail-safe: [contratto IVA marketplace](marketplace-vat.md). Questa implementazione supera le descrizioni storiche di IVA meramente descrittiva e spedizione sempre irrisolta per le vendite; commissioni e flussi economici restano invariati.
+
+
 ## Refresh coordinato navy/aqua — 19 ottobre 2026
 
 EXISTING: tema scuro centralizzato in `resources/css/app.css`, applicato a layout, accesso/registrazione, dashboard, catalogo, card, badge, form, notifiche e dialog. I token `canvas`, `surface`, `raised`, `line`, `control`, `ink` e `muted` separano le superfici dal testo; aqua identifica CTA e focus, con testo navy sui pulsanti pieni. Stati di errore/successo mantengono etichette e colori distinti. Nessun font remoto, framework o dipendenza applicativa aggiunti.

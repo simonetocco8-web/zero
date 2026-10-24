@@ -6,13 +6,18 @@ use App\Contracts\ExchangePaymentGatewayInterface;
 use App\Contracts\MarketplacePaymentGatewayInterface;
 use App\Contracts\StoreGatewayInterface;
 use App\Contracts\StripeBillingGateway;
+use App\Models\CartItem;
+use App\Models\Order;
+use App\Models\User;
 use App\Services\Billing\StripeSdkGateway;
 use App\Services\Payments\FakeMarketplacePaymentGateway;
 use App\Services\Payments\StripeConnectMarketplaceGateway;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\CurlClient;
@@ -53,6 +58,20 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        View::composer('components.marketplace-layout', function ($view) {
+            $user = auth()->user();
+            $cartCount = 0;
+            $orderCount = 0;
+            if (! ($view->getData()['entry'] ?? false) && $user?->can('purchase', User::class)) {
+                $counts = DB::query()
+                    ->selectSub(CartItem::selectRaw('count(*)')->whereHas('cart', fn ($query) => $query->where('user_id', $user->id)), 'cart_count')
+                    ->selectSub(Order::selectRaw('count(*)')->where('user_id', $user->id), 'order_count')
+                    ->first();
+                $cartCount = (int) $counts->cart_count;
+                $orderCount = (int) $counts->order_count;
+            }
+            $view->with(['marketplaceCartCount' => $cartCount, 'marketplaceOrderCount' => $orderCount]);
+        });
         Paginator::defaultView('pagination.accessible');
         RateLimiter::for('availability', fn (Request $request) => [Limit::perMinute(5)->by('availability-minute:'.$request->ip()), Limit::perHour(20)->by('availability-hour:'.$request->ip())]);
     }

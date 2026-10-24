@@ -1,6 +1,7 @@
 @php
 $editing=$item->exists; $title=$editing ? 'Modifica giacenza':'Metti in vendita';
 $quantity=isset($data['quantity_milliunits']) ? \App\Support\DisplayQuantity::input($data['quantity_milliunits']):'';
+$vatRate=fn($key)=>isset($data[$key]) ? (string)\Brick\Math\BigDecimal::of($data[$key])->dividedBy(100,2):'';
 $price=fn($key)=>isset($data[$key]) ? (string)\Brick\Math\BigDecimal::of($data[$key])->dividedBy(100,2):'';
 @endphp
 <x-layouts.retailer :title="$title"><h1 class="mb-5">{{ $title }}</h1>
@@ -28,10 +29,15 @@ $price=fn($key)=>isset($data[$key]) ? (string)\Brick\Math\BigDecimal::of($data[$
 <fieldset><legend class="mb-4 text-lg font-semibold">Prezzo e quantità</legend><div class="grid gap-5 sm:grid-cols-2"><x-field name="quantity" label="Quantità disponibile" :value="$quantity" inputmode="decimal" required hint="Fino a tre decimali." />
 <x-field name="list_price" label="Prezzo di listino (€)" :value="$price('list_price_cents')" inputmode="decimal" />
 <x-select name="vat_treatment" label="Trattamento IVA"><option value="">Da definire</option>@foreach(config('marketplace.vat_treatments') as $value=>$label)<option value="{{ $value }}" @selected(old('vat_treatment',$data['vat_treatment']??'')===$value)>{{ $label }}</option>@endforeach</x-select>
+<x-field name="vat_rate" label="Aliquota IVA merce (%)" :value="$vatRate('vat_rate_basis_points')" inputmode="decimal" hint="Esplicita, da 0 a 100, massimo due decimali. Vuoto: IVA da definire. IVA non applicabile: vuoto o zero." />
 <x-field name="zero_price" label="Prezzo ZeroMagazzino (€)" :value="$price('zero_price_cents')" inputmode="decimal" required />
 </div></fieldset>
 <fieldset><legend class="mb-4 text-lg font-semibold">Opzioni</legend><fieldset><legend class="field-label">Consegna</legend>@foreach(['pickup_available'=>'Ritiro in sede','shipping_available'=>'Spedizione'] as $key=>$label)<x-checkbox :name="$key" :label="$label" :checked="$data[$key]??false" />@endforeach</fieldset>
-<x-field name="shipping_cost" label="Costo consegna (€)" :value="$price('shipping_cost_cents')" inputmode="decimal" hint="Vuoto: costo da definire. Zero: gratuito. Nessun calcolo fiscale automatico." />
+<x-field name="shipping_cost" label="Costo consegna (€)" :value="$price('shipping_cost_cents')" inputmode="decimal" hint="Vuoto: costo da definire. Zero: gratuito. Specifica sotto se il costo comprende o esclude l’IVA." />
+<div class="mt-5 grid gap-5 sm:grid-cols-2">
+<x-select name="shipping_vat_treatment" label="Trattamento IVA spedizione"><option value="">Da definire</option>@foreach(config('marketplace.vat_treatments') as $value=>$label)<option value="{{ $value }}" @selected(old('shipping_vat_treatment',$data['shipping_vat_treatment']??'')===$value)>{{ $label }}</option>@endforeach</x-select>
+<x-field name="shipping_vat_rate" label="Aliquota IVA spedizione (%)" :value="$vatRate('shipping_vat_rate_basis_points')" inputmode="decimal" hint="Indipendente dall’aliquota merce. Necessaria per spedizione a pagamento con IVA inclusa o esclusa. Ritiro e spedizione gratuita non richiedono aliquota." />
+</div>
 <x-textarea name="delivery_notes" label="Note consegna" maxlength="2000">{{ old('delivery_notes',$data['delivery_notes']??'') }}</x-textarea>
 @if(auth()->user()->retailer->activeSubscription?->plan->exchange_available)<x-checkbox name="exchange_available" label="Scambio disponibile" :checked="$data['exchange_available']??false" />@else<p class="text-sm text-muted">Scambio disponibile solo con piano PRO attivo.</p>@endif
 </fieldset>

@@ -20,8 +20,8 @@
                         <td>
                             @if(in_array($item->status->value, ['pending', 'change_pending']))
                                 <div class="flex flex-wrap gap-2">
-                                    <x-admin-confirm name="stock-approve-{{ $item->id }}" label="APPROVA E PUBBLICA" :url="route('admin.stock.review', $item)" decision="published" />
-                                    <x-admin-confirm name="stock-reject-{{ $item->id }}" label="RIFIUTA" :url="route('admin.stock.review', $item)" decision="rejected" variant="danger" :reason="true" />
+                                    <x-admin-confirm name="stock-approve-{{ $item->id }}" label="APPROVA E PUBBLICA" icon="check-circle" :url="route('admin.stock.review', $item)" decision="published" />
+                                    <x-admin-confirm name="stock-reject-{{ $item->id }}" label="RIFIUTA" icon="x-circle" :url="route('admin.stock.review', $item)" decision="rejected" variant="danger" :reason="true" />
                                 </div>
                             @else
                                 <span class="text-muted">Non richiesta</span>
