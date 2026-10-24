@@ -93,7 +93,7 @@ class ExchangeDomainTest extends TestCase
         $this->assertSame($b->id, $v->payee_retailer_id);
         $this->assertDatabaseCount('stock_reservations', 0);
         $this->assertDatabaseCount('exchange_acceptances', 0);
-        $this->actingAs($a->user)->get(route('retailer.exchanges.show', $e))->assertOk()->assertSee('Storico versioni')->assertSee('3,00');
+        $this->actingAs($a->user)->get(route('retailer.exchanges.show', $e))->assertOk()->assertSee('Versioni precedenti')->assertSee('3,00');
         $pa->update(['name' => 'Nome cambiato', 'zero_price_cents' => 1]);
         $this->assertNotSame('Nome cambiato', $v->lines->first()->product_snapshot['name']);
     }
@@ -476,7 +476,7 @@ class ExchangeDomainTest extends TestCase
         DB::enableQueryLog();
         DB::flushQueryLog();
         try {
-            $this->get(route('retailer.exchanges.show', $e))->assertOk()->assertSee('Versione 9');
+            $this->get(route('retailer.exchanges.show', $e))->assertOk()->assertSee('Versione corrente: 9');
             $this->assertLessThanOrEqual(16, count(DB::getQueryLog()));
         } finally {
             DB::disableQueryLog();

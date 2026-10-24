@@ -1,5 +1,10 @@
 # Scambi versionati tra rivenditori PRO
 
+## EXISTING — riepilogo orientato al rivenditore
+
+Stato, prossima azione, confronto «Tu offri / Tu ricevi», KPI e versioni precedenti collassabili: [presentazione e verifiche](exchange-detail-ux.md). Intervento solo UI; dominio, form e autorizzazioni invariati.
+
+
 > Aggiornamento 16 ottobre 2026: il PDF pagamenti v1.0 e [marketplace-payments.md](marketplace-payments.md) prevalgono sui valori di sviluppo sotto. Checkout 30m, conguaglio 1440m, proposta 48h; conguaglio calcolato solo sui totali merce. Adapter Connect ora disponibile ma disabilitato per default; il credito retailer maturato è spendibile anche con carta secondo la successiva istruzione vincolante del committente; il bonus customer è separato. Nessun incasso live eseguito.
 
 > Riallineamento successivo: [audit economico marketplace](marketplace-payments.md) e [ADR funds flow](adr/marketplace-funds-flow.md) prevalgono sui limiti storici qui descritti (fee scambio, TTL, trasporto e rimborso senza restock). I risultati di verifica riportati sotto descrivono la fase precedente.
