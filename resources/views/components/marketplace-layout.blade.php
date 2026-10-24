@@ -12,14 +12,13 @@
             <span class="text-xs font-semibold text-muted">Materiali fermi. Nuove possibilità.</span>
         @else
             <nav aria-label="Navigazione principale" class="flex flex-wrap items-center gap-2">
-                <a class="btn btn-secondary" href="{{ route('marketplace.index') }}">Marketplace</a>
-                <x-category-menu />
+                <a class="btn btn-secondary" href="{{ route('marketplace.index') }}">Vai a Marketplace</a>
                 @auth
                     @can('purchase', \App\Models\User::class)
-                        <a class="btn btn-secondary" href="{{ route('cart.index') }}">Carrello</a>
-                        <a class="btn btn-secondary" href="{{ route('orders.index') }}">Ordini</a>
+                        <a class="btn btn-secondary relative" href="{{ route('cart.index') }}" aria-label="Carrello{{ $marketplaceCartCount ? ', '.$marketplaceCartCount.($marketplaceCartCount === 1 ? ' prodotto' : ' prodotti') : '' }}" title="Carrello"><x-icon name="cart" />@if($marketplaceCartCount)<span data-cart-count aria-hidden="true" class="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-700 px-1 text-xs font-bold text-white">{{ $marketplaceCartCount }}</span>@endif</a>
+                        <a class="btn btn-secondary relative" href="{{ route('orders.index') }}" aria-label="Ordini{{ $marketplaceOrderCount ? ', '.$marketplaceOrderCount.($marketplaceOrderCount === 1 ? ' ordine' : ' ordini') : '' }}" title="Ordini"><x-icon name="document" />@if($marketplaceOrderCount)<span data-order-count aria-hidden="true" class="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-700 px-1 text-xs font-bold text-white">{{ $marketplaceOrderCount }}</span>@endif</a>
                     @endcan
-                    <a class="btn btn-primary" href="{{ route('dashboard') }}">La tua area</a>
+                    <a class="btn btn-primary" href="{{ route('dashboard') }}" aria-label="La tua area" title="La tua area"><x-icon name="user" /></a>
                 @else
                     <a class="btn btn-primary" href="{{ route('login') }}">Accedi</a>
                 @endauth

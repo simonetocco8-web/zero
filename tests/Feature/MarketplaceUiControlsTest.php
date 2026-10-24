@@ -23,7 +23,7 @@ class MarketplaceUiControlsTest extends TestCase
         return new DOMXPath($document);
     }
 
-    public function test_category_dropdown_uses_all_active_categories_on_home_and_catalog(): void
+    public function test_header_omits_category_dropdown_while_category_pages_remain_accessible(): void
     {
         $this->actingAs(User::factory()->create(['role' => 'customer']));
         $active = Category::create(['name' => 'Nuova categoria', 'slug' => 'nuova-categoria', 'is_active' => true, 'sort_order' => 99]);
@@ -32,16 +32,8 @@ class MarketplaceUiControlsTest extends TestCase
         foreach ([route('home'), route('marketplace.index'), route('marketplace.category', $active->slug)] as $url) {
             $html = $this->get($url)->assertOk()->getContent();
             $xpath = $this->document($html);
-            $links = $xpath->query('//nav[@aria-label="Categorie marketplace"]/a');
-            $this->assertCount(Category::where('is_active', true)->count(), $links);
-            $hrefs = [];
-            foreach ($links as $link) {
-                $hrefs[] = $link->getAttribute('href');
-            }
-            foreach (Category::where('is_active', true)->get() as $category) {
-                $this->assertContains(route('marketplace.category', $category->slug), $hrefs);
-            }
-            $this->assertNotContains(route('marketplace.category', 'categoria-nascosta'), $hrefs);
+            $this->assertCount(0, $xpath->query('//header//nav[@aria-label="Categorie marketplace"]'));
+            $this->assertCount(1, $xpath->query('//header//a[text()="Vai a Marketplace"]'));
         }
     }
 

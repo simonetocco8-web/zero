@@ -35,7 +35,7 @@ class BrandEntryTest extends TestCase
     public function test_other_guest_pages_keep_access_and_customer_registration_links(): void
     {
         $this->get(route('login'))->assertOk()->assertSee('href="'.route('register').'"', false);
-        $this->mock(MarketplaceCatalog::class, fn ($mock) => $mock->shouldReceive('categories')->once()->andReturn(collect()));
+        $this->mock(MarketplaceCatalog::class, fn ($mock) => $mock->shouldNotReceive('categories'));
         $html = Blade::render('<x-marketplace-layout title="Informazioni">Contenuto</x-marketplace-layout>');
         $this->assertStringContainsString('href="'.route('login').'"', $html);
         $this->assertStringContainsString('href="'.route('customer.register').'"', $html);

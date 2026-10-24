@@ -2,7 +2,7 @@
     <h1>Ordine #{{ $order->id }}</h1>
     <p class="my-3">Stato: {{ $order->status->label() }}. {{ $order->payment?->simulated ? 'Pagamento simulato: nessun addebito reale.' : 'Pagamento marketplace tramite Stripe.' }}</p>
     @if($order->status->value==='payment_pending')
-        <p class="my-3">Prenotazione fino al {{ $order->stockReservations()->where('status','active')->min('expires_at') ?: '—' }}.</p>
+        <p class="my-3">Prenotazione fino al {{ ($expiry = $order->stockReservations()->where('status','active')->min('expires_at')) ? \Illuminate\Support\Carbon::parse($expiry)->format('d/m/Y') : '—' }}.</p>
     @endif
     @if(session('status'))
         <x-alert>{{ session('status') }}</x-alert>

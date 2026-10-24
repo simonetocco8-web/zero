@@ -13,7 +13,7 @@ class MarketplaceOrderController extends Controller
     public function index(Request $r)
     {
         $filters = $r->validate(['status' => ['nullable', 'in:payment_pending,paid,preparing,shipped,ready_for_pickup,completed,cancelled,refunded']]);
-        $query = Order::where('user_id', $r->user()->id);
+        $query = Order::with('vendorOrders')->where('user_id', $r->user()->id);
         if (! empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }

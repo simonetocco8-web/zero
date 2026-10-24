@@ -89,6 +89,22 @@ class InventoryItem extends Model
         return $this->taxLabel($this->shipping_vat_treatment, $this->shipping_vat_rate_basis_points);
     }
 
+    public function shippingCostLabel(): string
+    {
+        if ($this->shipping_cost_cents === null) {
+            return 'Costo da definire';
+        }
+        if ($this->shipping_cost_cents === 0) {
+            return 'Gratuita';
+        }
+        $tax = app(MarketplaceTaxSnapshot::class)->amount($this->shipping_cost_cents, $this->shipping_vat_treatment, $this->shipping_vat_rate_basis_points, 'Spedizione');
+        if ($tax['provisional']) {
+            return DisplayMoney::euros($this->shipping_cost_cents).' · IVA da definire';
+        }
+
+        return DisplayMoney::euros($tax['gross_cents']).($this->shipping_vat_treatment === 'not_applicable' ? ' · IVA non applicabile' : ' · IVA inclusa');
+    }
+
     private function taxLabel(?string $treatment, ?int $rate): string
     {
         $label = config('marketplace.vat_treatments.'.$treatment);
