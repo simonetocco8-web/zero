@@ -1,2 +1,6 @@
 @props(['request', 'suffix' => 'mobile'])
-<form method="POST" action="{{ route('retailer.requests.update',$request) }}" class="flex flex-wrap gap-2">@csrf @method('PATCH')<label class="sr-only" for="state-{{ $request->id }}-{{ $suffix }}">Stato richiesta {{ $request->id }}</label><select class="field w-auto min-w-0" id="state-{{ $request->id }}-{{ $suffix }}" name="status">@foreach(['new'=>'Nuova','contacted'=>'Contattato','closed'=>'Chiusa'] as $value=>$label)<option value="{{ $value }}" @selected($request->status->value===$value)>{{ $label }}</option>@endforeach</select><x-button type="submit" variant="secondary">Salva stato</x-button></form>
+@php($states = ['new' => ['In lavorazione', 'clock'], 'contacted' => ['Risposta', 'chat'], 'closed' => ['Chiusa', 'check-circle']])
+<div class="space-y-2"><p class="text-sm font-semibold">{{ $states[$request->status->value][0] }}</p>
+<form method="POST" action="{{ route('retailer.requests.update',$request) }}" class="flex flex-wrap gap-2" aria-label="Stato richiesta {{ $request->id }}">@csrf @method('PATCH')
+@foreach($states as $value => [$label, $icon])<x-button type="submit" name="status" :value="$value" :variant="$request->status->value === $value ? 'primary' : 'secondary'" :aria-label="$label" :title="$label" :aria-pressed="$request->status->value === $value ? 'true' : 'false'"><x-icon :name="$icon" /></x-button>@endforeach
+</form></div>

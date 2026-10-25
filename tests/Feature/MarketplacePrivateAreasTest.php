@@ -104,7 +104,7 @@ class MarketplacePrivateAreasTest extends TestCase
         $o = $this->order($u, [$this->product($a, 'Solo venditore A'), $this->product($b, 'Segreto venditore B')]);
         $va = $o->vendorOrders()->where('retailer_id', $a->id)->sole();
         $vb = $o->vendorOrders()->where('retailer_id', $b->id)->sole();
-        $this->actingAs($a->user)->get(route('retailer.sales.index'))->assertOk()->assertSee('Solo venditore A')->assertDontSee('Segreto venditore B');
+        $this->actingAs($a->user)->get(route('retailer.sales.index'))->assertOk()->assertSee(route('retailer.sales.show', $va))->assertDontSee(route('retailer.sales.show', $vb))->assertDontSee('Segreto venditore B');
         $this->get(route('retailer.sales.show', $va))->assertOk()->assertSee('Solo venditore A')->assertDontSee('Segreto venditore B');
         $this->get(route('retailer.sales.show', $vb))->assertForbidden();
         $this->patch(route('retailer.sales.update', $vb), ['status' => 'preparing'])->assertForbidden();
