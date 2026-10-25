@@ -236,7 +236,7 @@ class InventoryManagementAccessTest extends TestCase
         $this->assertSame('1000', DisplayQuantity::format(1000000));
         $i = $this->item();
         $i->update(['quantity' => '1']);
-        $this->actingAs($i->retailer->user)->get(route('retailer.stock.show', $i))->assertSee('Quantità: 1 ')->assertDontSee('Quantità: 1.000');
+        $this->actingAs($i->retailer->user)->get(route('retailer.stock.show', $i))->assertSee('Quantità disponibile')->assertSee('1 '.$i->unit)->assertDontSee('1.000 '.$i->unit);
         $this->get(route('retailer.dashboard'))->assertSee('Vai al marketplace');
     }
 }
