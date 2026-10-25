@@ -24,7 +24,7 @@ class RetailerSalesController extends Controller
         $id = $r->user()->retailer?->id;
         abort_unless($id, 403);
         $f = $r->validate(['status' => ['nullable', 'in:payment_pending,paid,preparing,shipped,ready_for_pickup,completed,cancelled,refunded'], 'order_id' => ['nullable', 'integer', 'min:1']]);
-        $q = VendorOrder::where('retailer_id', $id)->with('items');
+        $q = VendorOrder::where('retailer_id', $id)->with('order:id,customer_snapshot');
         foreach ($f as $field => $value) {
             if ($value !== null && $value !== '') {
                 $q->where($field, $value);

@@ -1,0 +1,10 @@
+# Ordini, richieste e navigazione riservata
+
+- `/retailer/vendite/ordini`: tabella ID, Status, Cliente e Totale Ordine. ID del sottoordine collegato al dettaglio, riferimento all'ordine padre e totale della sola quota del rivenditore. Cliente dallo snapshot dell'ordine, caricato anticipatamente senza query per riga. Filtri, paginazione e isolamento per venditore invariati. Su schermi stretti la tabella scorre nel proprio contenitore.
+- `/retailer/requests`: tre pulsanti a icona con label accessibile, tooltip e stato corrente anche testuale. «In lavorazione» corrisponde a `new`, «Risposta» a `contacted`, «Chiusa» a `closed`. Valori persistiti, timestamp, CSRF, validazione e autorizzazioni restano quelli esistenti.
+- Dettaglio marketplace: Acquista e Proponi uno scambio affiancati con icone carrello/scambio; ritorno a capo quando lo spazio è insufficiente. Richiedi informazioni separato. Eleggibilità e disponibilità restano determinate dalle condizioni esistenti.
+- Navigazione amministrazione, rivenditore e cliente: sottomenù visibili solo nella sezione corrente; evidenziazione del gruppo e della voce pertinente, anche per dettagli, risorse amministrative e tab ricevute/inviate. Stessa logica per sidebar e menu mobile. I link a frammenti restano disponibili nel gruppo ma non producono una seconda voce corrente sulla stessa pagina.
+
+`BackofficePresentationTest` verifica tabella e isolamento degli importi, icone e valori dei tre stati, azioni marketplace autorizzate, espansione contestuale e selezione delle voci. Il test di isolamento preesistente usa i collegamenti dei sottoordini al posto dei nomi dei prodotti rimossi dalla lista. Nessuna migration o modifica ai flussi economici.
+
+Verifica locale finale: 7 nuovi casi di presentazione; SQLite completa 552 passati e 28 skip previsti; MySQL 8.4 completa 580 passati. Pint, Vite e compilazione Blade superati. Browser a 320/375/768/1280/1536 px e tema scuro a 375/1536 px: nessun overflow della pagina, target tattili almeno 44 px e azioni acquisto/scambio affiancate quando c'è spazio. `.env` verificato invariato.
