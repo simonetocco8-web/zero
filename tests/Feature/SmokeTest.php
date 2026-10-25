@@ -7,11 +7,13 @@ use App\Models\Retailer;
 use App\Models\User;
 use Database\Seeders\PlanSeeder;
 use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
+use Tests\Concerns\WithCompanyRegistrationContext;
 use Tests\TestCase;
 
 class SmokeTest extends TestCase
 {
     use RefreshDatabase;
+    use WithCompanyRegistrationContext;
 
     public function test_home_and_login_are_public(): void
     {
@@ -82,7 +84,7 @@ class SmokeTest extends TestCase
     public function test_registration_cannot_assign_admin_role(): void
     {
         $this->seed(PlanSeeder::class);
-        $this->post(route('register'), [
+        $this->withCompanyRegistrationContext()->post(route('register'), [
             'company_name' => 'Retailer', 'vat_number' => '12345678901', 'city' => 'Roma', 'plan_code' => 'free',
             'email' => 'retailer@example.test',
             'password' => 'a-test-password',

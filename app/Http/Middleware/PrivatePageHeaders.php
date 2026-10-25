@@ -13,7 +13,7 @@ class PrivatePageHeaders
         $response = $next($request);
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        if ($request->user() || $request->routeIs('login', 'register', 'password.*', 'verification.*')) {
+        if ($request->user() || $request->routeIs('login', 'register', 'register.*', 'password.*', 'verification.*')) {
             $response->headers->set('Cache-Control', 'private, no-store');
         }
 

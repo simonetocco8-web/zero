@@ -12,14 +12,18 @@ use App\Models\Subscription;
 use App\Models\User;
 use Database\Seeders\PlanSeeder;
 use Tests\Concerns\AdditiveRefreshDatabase as RefreshDatabase;
+use Tests\Concerns\WithCompanyRegistrationContext;
 use Tests\TestCase;
 
 class RetailerFlowTest extends TestCase
 {
     use RefreshDatabase;
+    use WithCompanyRegistrationContext;
 
     private function registration(array $extra = []): array
     {
+        $this->withCompanyRegistrationContext();
+
         return array_replace(['company_name' => 'Edilizia Roma', 'vat_number' => '12345678901', 'city' => 'Roma', 'email' => 'retailer@example.test', 'password' => 'test-password', 'password_confirmation' => 'test-password', 'plan_code' => 'free'], $extra);
     }
 

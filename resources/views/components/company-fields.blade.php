@@ -1,7 +1,7 @@
-@props(['retailer' => null])
+@props(['retailer' => null, 'vatReadonly' => false])
 <div class="grid min-w-0 gap-5 sm:grid-cols-2">
 <x-field name="company_name" label="Ragione sociale" :value="$retailer?->company_name" required />
-<x-field name="vat_number" label="Partita IVA" inputmode="numeric" maxlength="11" :value="$retailer?->vat_number" required />
+<x-field name="vat_number" :readonly="$vatReadonly" :use-old="!$vatReadonly" label="Partita IVA" inputmode="numeric" maxlength="11" :value="$retailer?->vat_number" required />
 <x-field name="city" label="Città" :value="$retailer?->city" required />
 <x-field name="contact_name" label="Referente" :value="$retailer?->contact_name" />
 <x-field name="contact_email" label="Email contatto" :value="$retailer?->contact_email" type="email" />

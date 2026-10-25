@@ -16,9 +16,12 @@ Route::middleware('guest')->group(function () {
     Route::get('customer/register', [CustomerRegistrationController::class, 'create'])->name('customer.register');
     Route::post('customer/register', [CustomerRegistrationController::class, 'store'])->middleware('throttle:6,1');
     Route::get('register', [RegisteredUserController::class, 'create'])
-        ->name('register');
+        ->middleware('throttle:60,1')->name('register');
 
-    Route::post('register', [RegisteredUserController::class, 'store'])->middleware('throttle:6,1');
+    Route::post('register/company', [RegisteredUserController::class, 'lookup'])->middleware('throttle:10,1')->name('register.company.lookup');
+    Route::post('register/company/manual', [RegisteredUserController::class, 'manual'])->middleware('throttle:10,1')->name('register.company.manual');
+    Route::get('register/details', [RegisteredUserController::class, 'details'])->middleware('throttle:60,1')->name('register.details');
+    Route::post('register', [RegisteredUserController::class, 'store'])->middleware('throttle:6,1')->name('register.store');
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
