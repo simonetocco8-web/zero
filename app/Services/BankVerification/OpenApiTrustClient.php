@@ -118,7 +118,9 @@ class OpenApiTrustClient
                 }
                 $result['vop_result'] = $outcome;
                 $result['match_type'] = $type;
-                $result['owner_name'] = in_array($outcome, ['MATCH', 'CLOSE_MATCH', 'NO_MATCH'], true)
+                // ownerName is actionable only for CLOSE_MATCH. For MATCH it is redundant,
+                // while NO_MATCH must never be treated as an account-holder discovery result.
+                $result['owner_name'] = $outcome === 'CLOSE_MATCH'
                     ? ($this->strings($details, ['ownerName'])['ownerName'] ?? null) : null;
             }
 
