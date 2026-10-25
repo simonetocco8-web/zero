@@ -20,6 +20,7 @@ use App\Http\Controllers\MarketplaceConnectController;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\MarketplaceNotificationController;
 use App\Http\Controllers\MarketplaceOrderController;
+use App\Http\Controllers\RetailerBankVerificationController;
 use App\Http\Controllers\RetailerController;
 use App\Http\Controllers\RetailerSalesController;
 use App\Http\Middleware\EnsureApprovedRetailer;
@@ -79,6 +80,7 @@ Route::middleware(['auth', 'can:accessRetailerArea,'.User::class])->prefix('reta
     Route::get('billing', [BillingController::class, 'index'])->name('billing');
     Route::post('billing/checkout', [BillingController::class, 'checkout'])->middleware('throttle:5,1')->name('billing.checkout');
     Route::get('billing/return', [BillingController::class, 'returned'])->name('billing.return');
+    Route::post('profile/bank-verification', RetailerBankVerificationController::class)->middleware('throttle:5,1')->name('bank-verification.store');
     Route::get('profile', [RetailerController::class, 'profile'])->name('profile');
     Route::put('profile', [RetailerController::class, 'update'])->middleware('throttle:20,1')->name('profile.update');
 });
@@ -102,7 +104,7 @@ Route::middleware(['auth', 'can:accessAdministration,'.User::class])->prefix('ad
     Route::patch('stock/{item}/review', [AdminInventoryController::class, 'review'])->middleware('throttle:20,1')->name('stock.review');
     Route::get('payouts', [AdminPayoutController::class, 'index'])->name('payouts');
     Route::patch('payouts/{payout}/review', [AdminPayoutController::class, 'review'])->middleware('throttle:20,1')->name('payouts.review');
-    Route::view('settings', 'pages.placeholder', ['area' => 'admin', 'title' => 'Impostazioni', 'description' => 'Le preferenze della piattaforma.', 'icon' => 'settings'])->name('settings');
+    Route::view('settings', 'admin.settings')->name('settings');
 });
 
 Route::get('inventory/{item}/photos/{position}', [InventoryController::class, 'image'])->middleware('auth')->whereNumber('position')->name('inventory.image');
