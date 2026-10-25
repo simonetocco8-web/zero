@@ -1,22 +1,13 @@
-<x-guest-layout title="Registrazione">
-<nav class="mb-6 flex gap-5" aria-label="Accesso"><a class="inline-flex min-h-11 items-center underline" href="{{ route('login') }}">Accedi</a><span class="inline-flex min-h-11 items-center font-semibold" aria-current="page">Registrati</span></nav>
-<a class="inline-flex min-h-11 items-center underline" href="{{ route('customer.register') }}">Registrati come cliente</a>
-<h1>Registra la tua azienda</h1><p class="my-4 text-sm text-muted">Dopo la registrazione verificheremo il profilo della tua azienda.</p>
-@if($errors->has('company_exists'))
-<x-alert variant="danger" title="Azienda già registrata" class="mb-5">
-    <p>Questa Partita IVA risulta già associata a un'azienda registrata su ZeroMagazzino. Se l'azienda è la tua, accedi con le credenziali esistenti oppure recupera la password.</p>
-    <div class="mt-3 flex flex-wrap gap-3"><x-button variant="secondary" :href="route('login')">Accedi</x-button><x-button variant="secondary" :href="route('password.request')">Recupera password</x-button></div>
-</x-alert>
-@endif
-<form method="POST" action="{{ route('register') }}" class="space-y-5">@csrf
-<x-company-fields />
-<x-field name="email" label="Email account" type="email" required autocomplete="username" />
-<x-field name="password" label="Password" type="password" required autocomplete="new-password" hint="Usa almeno 8 caratteri." />
-<x-field name="password_confirmation" label="Conferma password" type="password" required autocomplete="new-password" />
-<fieldset><legend class="field-label">Scegli il piano</legend><div class="space-y-3">
-@foreach($plans as $plan)<label class="flex min-h-11 gap-3 rounded-xl border border-line p-4"><input type="radio" name="plan_code" value="{{ $plan->code }}" required @checked(old('plan_code','free') === $plan->code)><span><strong>{{ $plan->name }}</strong><span class="block text-sm">{{ \App\Support\DisplayMoney::euros($plan->monthly_price_cents) }} / mese · Commissione {{ app(\App\Services\MarketplaceCommission::class)->saleLabel($plan->code) }}</span>@if($plan->code === 'pro')<span class="block text-sm">Annuale: {{ \App\Support\DisplayMoney::euros($plan->annual_price_cents) }}. Pagamento da attivare separatamente.</span>@endif</span></label>@endforeach
-</div>@error('plan_code')<p class="text-sm text-red-300">{{ $message }}</p>@enderror</fieldset>
-<p class="text-sm text-muted">La scelta PRO non addebita alcun importo e non approva automaticamente il profilo.</p>
-<x-button type="submit" class="w-full">Registrati</x-button>
+<x-guest-layout title="Registrazione azienda">
+<h1>Registra la tua azienda</h1>
+<x-registration-steps />
+<p class="mb-5 text-sm text-muted">Inserisci la Partita IVA della tua azienda. Cercheremo automaticamente i dati ufficiali per velocizzare la registrazione.</p>
+<x-registration-company-duplicate />
+@error('registration_step')<x-alert class="mb-4">{{ $message }}</x-alert>@enderror
+<form method="POST" action="{{ route('register.company.lookup') }}" class="space-y-5">@csrf
+<x-field name="vat_number" label="Partita IVA" inputmode="numeric" autocomplete="off" required maxlength="16" hint="Inserisci le 11 cifre della Partita IVA italiana." />
+<x-button type="submit" class="w-full">Continua</x-button>
 </form>
+<p class="mt-5 text-sm">Hai già un account? <a class="inline-flex min-h-11 min-w-11 items-center underline" href="{{ route('login') }}">Accedi</a></p>
+<a class="inline-flex min-h-11 min-w-11 items-center underline" href="{{ route('customer.register') }}">Registrati come cliente</a>
 </x-guest-layout>

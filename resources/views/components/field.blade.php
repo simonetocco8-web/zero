@@ -1,7 +1,7 @@
-@props(['name', 'label', 'type' => 'text', 'value' => null, 'hint' => null])
+@props(['name', 'label', 'type' => 'text', 'value' => null, 'hint' => null, 'useOld' => true])
 @php
 $invalid = $errors->has($name);
-$displayValue = old($name, $value);
+$displayValue = $useOld ? old($name, $value) : $value;
 $displayValue = is_scalar($displayValue) ? $displayValue : null;
 @endphp
 <div>

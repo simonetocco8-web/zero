@@ -10,14 +10,18 @@ use App\Support\RegistrationMessages;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\AdditiveRefreshDatabase;
+use Tests\Concerns\WithCompanyRegistrationContext;
 use Tests\TestCase;
 
 class DuplicateCompanyRegistrationTest extends TestCase
 {
     use AdditiveRefreshDatabase;
+    use WithCompanyRegistrationContext;
 
     private function registration(): array
     {
+        $this->withCompanyRegistrationContext();
+
         return ['company_name' => 'Nuova azienda', 'vat_number' => '12345678901', 'city' => 'Roma', 'plan_code' => 'free', 'email' => 'new-account@example.test', 'password' => 'password', 'password_confirmation' => 'password'];
     }
 
@@ -31,9 +35,9 @@ class DuplicateCompanyRegistrationTest extends TestCase
     public function test_duplicate_vat_has_structured_alert_and_account_recovery_links_without_creating_any_data(): void
     {
         $counts = [User::count(), Retailer::count(), Subscription::count()];
-        $this->from('/register')->post('/register', $this->registration())->assertRedirect('/register')
+        $this->from('/register')->post('/register', $this->registration())->assertRedirect('/register/details')
             ->assertSessionHasErrors(['vat_number' => RegistrationMessages::DUPLICATE_VAT, 'company_exists' => RegistrationMessages::DUPLICATE_VAT]);
-        $response = $this->withCookie(config('session.cookie'), session()->getId())->get('/register')->assertOk()
+        $response = $this->withCookie(config('session.cookie'), session()->getId())->get('/register/details')->assertOk()
             ->assertSee('Azienda già registrata')->assertSee(RegistrationMessages::DUPLICATE_VAT)
             ->assertSee('href="'.route('login').'"', false)->assertSee('href="'.route('password.request').'"', false)->assertSee('Recupera password');
         $this->assertSame($counts, [User::count(), Retailer::count(), Subscription::count()]);

@@ -14,6 +14,12 @@ return [
     |
     */
 
+    'openapi_company' => [
+        'token' => env('OPENAPI_COMPANY_TOKEN'),
+        'base_url' => env('OPENAPI_COMPANY_BASE_URL', 'https://test.company.openapi.com'),
+        'timeout' => (int) env('OPENAPI_COMPANY_TIMEOUT', 10),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
