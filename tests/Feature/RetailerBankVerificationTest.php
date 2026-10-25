@@ -109,13 +109,13 @@ class RetailerBankVerificationTest extends TestCase
         $record = $this->process($record);
         $this->assertSame('MATCH', $record->vop_result);
         $this->assertSame('completed', $record->status);
-        $this->assertNotSame($record->vop_owner_name, $record->getRawOriginal('vop_owner_name'));
+        $this->assertNull($record->vop_owner_name);
         $this->assertArrayNotHasKey('vop_owner_name', $record->toArray());
         $this->assertArrayNotHasKey('company_name_checked', $record->toArray());
         Http::assertSent(fn ($request) => $request->method() === 'POST' && $request->url() === 'https://test.trust.openapi.com/iban-vop' && $request['iban'] === self::IBAN && $request['name'] === $retailer->company_name && $request->hasHeader('Authorization', 'Bearer fake-trust-token'));
         $audit = RetailerBankVerificationEvent::all()->toJson();
         $this->assertStringNotContainsString(self::IBAN, $audit);
-        $this->assertStringNotContainsString($record->vop_owner_name, $audit);
+        $this->assertStringNotContainsString('AZIENDA VERIFICATA', $audit);
         $this->assertStringNotContainsString('fake-trust-token', $audit);
     }
 
@@ -185,24 +185,36 @@ class RetailerBankVerificationTest extends TestCase
         $this->assertSame('valid', $record->iban_validation_status);
         $this->assertSame(self::IBAN, $retailer->fresh()->iban);
         $this->assertSame($name, $retailer->fresh()->company_name);
-        $response = $this->get(route('retailer.profile'))->assertOk()->assertSee('IBAN verificato')->assertSee($label)->assertDontSee(self::IBAN);
-        if (in_array($result, ['CLOSE_MATCH', 'NO_MATCH'])) {
-            $response->assertSee('Usa questa Ragione Sociale')->assertSee('AZIENDA VERIFICATA');
+        if ($result === 'CLOSE_MATCH') {
+            $this->assertSame('AZIENDA VERIFICATA', $record->vop_owner_name);
         } else {
-            $response->assertDontSee('Usa questa Ragione Sociale');
+            $this->assertNull($record->vop_owner_name);
+        }
+        $response = $this->get(route('retailer.profile'))->assertOk()->assertSee('IBAN verificato')->assertSee($label)->assertDontSee(self::IBAN);
+        if ($result === 'CLOSE_MATCH') {
+            $response->assertSee('Usa questa Ragione Sociale')->assertSee('AZIENDA VERIFICATA')->assertSee('Intestazione suggerita dalla banca');
+        } else {
+            $response->assertDontSee('Usa questa Ragione Sociale')->assertDontSee('AZIENDA VERIFICATA')->assertDontSee('Intestazione suggerita dalla banca');
         }
         if ($result !== 'MATCH') {
             $response->assertDontSee('Corrispondenza confermata');
         }
     }
 
-    public function test_absent_owner_does_not_produce_suggestion(): void
+    public function test_no_match_never_stores_or_exposes_provider_owner_name(): void
     {
         $retailer = Retailer::factory()->create();
         $record = $this->start($retailer);
-        $this->fake($this->advanced(), $this->vop('NO_MATCH', null));
-        $this->process($this->process($record));
-        $this->get(route('retailer.profile'))->assertOk()->assertSee('Intestatario non corrispondente')->assertDontSee('Usa questa Ragione Sociale');
+        $this->fake($this->advanced(), $this->vop('NO_MATCH', 'PRIVATE ACCOUNT HOLDER'));
+        $record = $this->process($this->process($record));
+
+        $this->assertSame('NO_MATCH', $record->vop_result);
+        $this->assertNull($record->vop_owner_name);
+        $this->get(route('retailer.profile'))->assertOk()
+            ->assertSee('Intestatario non corrispondente')
+            ->assertSee('non identifica né rivela il titolare del conto')
+            ->assertDontSee('PRIVATE ACCOUNT HOLDER')
+            ->assertDontSee('Usa questa Ragione Sociale');
     }
 
     public function test_unchanged_profile_reuses_verification_and_name_edit_only_starts_vop(): void
