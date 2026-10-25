@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RetailerBankVerificationRequest;
 use App\Models\Retailer;
 use App\Services\BankVerification\RetailerBankVerificationService;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class RetailerBankVerificationController extends Controller
 {
-    public function __invoke(Request $request, RetailerBankVerificationService $service)
+    public function __invoke(RetailerBankVerificationRequest $request, RetailerBankVerificationService $service)
     {
-        $data = $request->validate(['retry' => ['sometimes', 'boolean'], 'retailer_id' => ['prohibited'], 'verification_id' => ['prohibited'], 'iban' => ['prohibited']]);
+        $data = $request->validated();
         $retailer = $request->user()->retailer;
         abort_unless($retailer, 403);
         Gate::authorize('update', $retailer);

@@ -50,6 +50,14 @@ class RetailerBankVerificationService
         $candidate = strtoupper(preg_replace('/\s+/', '', $candidate));
         Validator::make(['iban' => $candidate], ['iban' => ['required', 'string', 'max:34', new Iban]])->validate();
         $fingerprint = $this->fingerprint($candidate);
+        if ($latest && $latest->status === 'pending' && $latest->iban_validation_status === 'pending'
+            && hash_equals($latest->iban_fingerprint, $fingerprint)) {
+            if ($latest->company_name_checked !== $retailer->company_name) {
+                $latest->update(['company_name_checked' => $retailer->company_name]);
+            }
+
+            return $latest;
+        }
         if ($latest && hash_equals($latest->iban_fingerprint, $fingerprint) && $latest->company_name_checked === $retailer->company_name
             && (! $retry || in_array($latest->status, ['pending', 'completed'], true)) && in_array($latest->status, ['pending', 'completed', 'failed'], true)) {
             return $latest;

@@ -403,6 +403,43 @@ class RetailerBankVerificationTest extends TestCase
         $this->assertCount(1, Http::recorded(fn ($request) => $request->method() === 'POST' && str_contains($request->url(), 'iban-advanced')));
     }
 
+    public function test_explicit_same_candidate_with_name_change_reuses_pending_advanced_request(): void
+    {
+        $retailer = Retailer::factory()->create();
+        $record = $this->start($retailer);
+        Http::fake([
+            '*/iban-advanced/'.self::IBAN => Http::response($this->advanced(state: 'WAIT')),
+            '*/iban-advanced/advanced-1' => Http::response($this->advanced()),
+            '*/iban-vop' => Http::response($this->vop()),
+        ]);
+
+        $record = $this->process($record);
+        $this->profile($retailer, ['company_name' => 'Nuova intestazione', 'iban' => self::IBAN])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('retailer_bank_verifications', 1);
+        $this->assertSame($record->id, RetailerBankVerification::latest('id')->value('id'));
+        $this->assertSame('Nuova intestazione', $record->fresh()->company_name_checked);
+
+        $this->travel(10)->seconds();
+        $record = $this->process($record);
+        $this->assertSame('valid', $record->iban_validation_status);
+        $this->process($record);
+
+        $this->assertCount(1, Http::recorded(fn ($request) => $request->method() === 'POST' && str_contains($request->url(), 'iban-advanced')));
+        Http::assertSent(fn ($request) => $request->url() === 'https://test.trust.openapi.com/iban-vop' && $request['name'] === 'Nuova intestazione');
+    }
+
+    public function test_bank_verification_request_rejects_non_boolean_retry_and_protected_fields(): void
+    {
+        $retailer = Retailer::factory()->create(['iban' => self::IBAN]);
+        $this->actingAs($retailer->user)
+            ->post(route('retailer.bank-verification.store'), ['retry' => 'not-a-boolean', 'iban' => self::OTHER])
+            ->assertSessionHasErrors(['retry', 'iban']);
+
+        $this->assertDatabaseCount('retailer_bank_verifications', 0);
+        Http::assertNothingSent();
+    }
+
     public function test_admin_sees_configuration_readiness_without_credentials_or_accounts(): void
     {
         config(['services.openapi_trust.token' => null]);
