@@ -3,7 +3,9 @@
 use App\Jobs\ProcessStorePublication;
 use App\Models\BillingSubscription;
 use App\Models\IntegrationEvent;
+use App\Models\RetailerBankVerification;
 use App\Models\StorePublication;
+use App\Services\BankVerification\RetailerBankVerificationService;
 use App\Services\ExchangeWorkflow;
 use App\Services\Integrations\IntegrationQueue;
 use App\Services\Integrations\WebhookInbox;
@@ -93,3 +95,13 @@ Artisan::command('marketplace:reconcile-payments', function () {
     $this->info('Riconciliazione pagamenti marketplace completata.');
 })->purpose('Reconcile pending refunds and refund late captures without consuming expired stock');
 Schedule::command('marketplace:reconcile-payments')->everyMinute()->withoutOverlapping();
+
+// Recovery for durable pending checks, including a worker interrupted after a paid POST.
+Artisan::command('bank-verifications:resume', function () {
+    RetailerBankVerification::where('status', 'pending')
+        ->where(fn ($query) => $query->whereNull('next_attempt_at')->orWhere('next_attempt_at', '<=', now()))
+        ->where(fn ($query) => $query->whereNull('processing_at')->orWhere('processing_at', '<=', now()->subSeconds(90)))
+        ->orderBy('id')->limit(500)->pluck('id')->each(fn ($id) => app(RetailerBankVerificationService::class)->enqueue($id));
+    $this->info('Verifiche bancarie pendenti accodate.');
+});
+Schedule::command('bank-verifications:resume')->everyMinute()->withoutOverlapping();

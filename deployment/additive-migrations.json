@@ -13,5 +13,6 @@
   "2026_10_16_000005_add_retailer_credit_funding",
   "2026_10_18_000001_add_inventory_soft_deletion",
   "2026_10_22_000001_allow_retailer_password_reset_audit",
-  "2026_10_24_000001_add_explicit_inventory_vat"
+  "2026_10_24_000001_add_explicit_inventory_vat",
+  "2026_10_25_000001_create_retailer_bank_verifications"
 ]

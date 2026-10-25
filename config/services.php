@@ -20,6 +20,15 @@ return [
         'timeout' => (int) env('OPENAPI_COMPANY_TIMEOUT', 10),
     ],
 
+    'openapi_trust' => [
+        'token' => env('OPENAPI_TRUST_TOKEN'),
+        'base_url' => env('OPENAPI_TRUST_BASE_URL', 'https://test.trust.openapi.com'),
+        'timeout' => (int) env('OPENAPI_TRUST_TIMEOUT', 10),
+        'max_attempts' => (int) env('OPENAPI_TRUST_MAX_ATTEMPTS', 8),
+        'poll_seconds' => (int) env('OPENAPI_TRUST_POLL_SECONDS', 30),
+        'max_minutes' => (int) env('OPENAPI_TRUST_MAX_MINUTES', 30),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

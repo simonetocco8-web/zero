@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\UpdateRetailerProfile;
 use App\Http\Requests\RetailerCompanyRequest;
+use App\Services\BankVerification\RetailerBankVerificationService;
 use App\Services\RetailerDashboard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -21,11 +22,11 @@ class RetailerController extends Controller
 
     public function profile(Request $request)
     {
-        $retailer = $request->user()->retailer;
+        $retailer = $request->user()->retailer?->fresh();
         abort_unless($retailer, 403);
         Gate::authorize('update', $retailer);
 
-        return view('retailer.profile', compact('retailer'));
+        return view('retailer.profile', ['retailer' => $retailer, 'bankVerification' => app(RetailerBankVerificationService::class)->latest($retailer), 'activeBankVerification' => app(RetailerBankVerificationService::class)->active($retailer)]);
     }
 
     public function update(RetailerCompanyRequest $request, UpdateRetailerProfile $action)
