@@ -66,14 +66,14 @@ Card Coordinate bancarie: IBAN attivo mascherato, eventuale candidato distinto, 
 
 | VoP | Presentazione |
 | --- | --- |
-| MATCH | Verde, Corrispondenza confermata, intestatario se disponibile |
-| CLOSE_MATCH | Corrispondenza parziale, confronto dei nomi e suggerimento facoltativo |
-| NO_MATCH | Intestatario non corrispondente; IBAN comunque valido |
+| MATCH | Verde, Corrispondenza confermata; nessun nome alternativo mostrato |
+| CLOSE_MATCH | Corrispondenza parziale, eventuale `details.ownerName` e suggerimento facoltativo |
+| NO_MATCH | Intestatario non corrispondente; IBAN comunque valido; nessun nome mostrato o suggerito |
 | NOT_APPLICABLE | Verifica non disponibile; nessuna falsa mancata corrispondenza o suggerimento |
 | ERROR | Verifica non completata; IBAN validato conservato, retry volontario |
 | UNKNOWN | Stato documentato aggiuntivo: se terminale DONE resta non confermato ed è trattato come errore recuperabile |
 
-Il suggerimento usa solo `details.ownerName` documentato per MATCH/CLOSE_MATCH/NO_MATCH; l'azione è offerta per CLOSE_MATCH/NO_MATCH. Il bottone valorizza il campo aziendale e richiede Salva profilo, senza modifiche invisibili o richieste HTTP automatiche. Dopo il salvataggio serve una nuova VoP: soltanto MATCH conferma l'intestazione.
+`details.ownerName` viene conservato e mostrato solo per `CLOSE_MATCH`, dove può servire come correzione suggerita. Per `MATCH` è ridondante; per `NO_MATCH` non viene memorizzato, mostrato o proposto come titolare del conto. La VoP verifica la coppia IBAN + nome e non deve essere usata come servizio di identificazione del titolare. Il bottone di suggerimento è quindi disponibile solo per `CLOSE_MATCH` e richiede comunque Salva profilo e una nuova VoP.
 
 ## Errori, audit e accesso
 
