@@ -3,18 +3,22 @@
 use App\Jobs\ProcessStorePublication;
 use App\Models\BillingSubscription;
 use App\Models\IntegrationEvent;
+use App\Models\InventoryImport;
 use App\Models\RetailerBankVerification;
 use App\Models\StorePublication;
 use App\Services\BankVerification\RetailerBankVerificationService;
 use App\Services\ExchangeWorkflow;
 use App\Services\Integrations\IntegrationQueue;
 use App\Services\Integrations\WebhookInbox;
+use App\Services\InventoryImport\ImportWorkflow;
 use App\Services\MarketplaceNotices;
 use App\Services\Payments\ReconcileMarketplacePayments;
 use App\Services\StockReservations;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Storage;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -105,3 +109,29 @@ Artisan::command('bank-verifications:resume', function () {
     $this->info('Verifiche bancarie pendenti accodate.');
 });
 Schedule::command('bank-verifications:resume')->everyMinute()->withoutOverlapping();
+
+Artisan::command('inventory-imports:recover', function () {
+    InventoryImport::whereIn('status', ['validating', 'queued', 'processing'])->where('heartbeat_at', '<=', now()->subMinutes(5))->orderBy('id')->limit(100)->get()->each(fn ($import) => $import->status === 'validating' ? app(ImportWorkflow::class)->enqueueValidation($import->id) : app(ImportWorkflow::class)->enqueue($import->id));
+    $this->info('Importazioni interrotte riaccodate.');
+});
+Schedule::command('inventory-imports:recover')->everyMinute()->withoutOverlapping();
+
+Artisan::command('inventory-imports:cleanup', function () {
+    InventoryImport::whereNull('purged_at')->where('updated_at', '<', now()->subDays(max(1, config('inventory_imports.retention_days'))))->whereNotIn('status', ['validating', 'queued', 'processing', 'failed'])->orderBy('id')->chunkById(100, function ($imports) {
+        foreach ($imports as $import) {
+            DB::transaction(function () use ($import) {
+                $import = InventoryImport::lockForUpdate()->findOrFail($import->id);
+                if (in_array($import->status, ['validating', 'queued', 'processing', 'failed'])) {
+                    return;
+                }
+                if ($import->path && ! Storage::disk('local')->delete($import->path)) {
+                    return;
+                }
+                $import->rows()->update(['cells' => null, 'payload' => null]);
+                $import->update(['path' => null, 'purged_at' => now()]);
+            });
+        }
+    });
+    $this->info('File temporanei scaduti eliminati. Storico ed esiti conservati.');
+});
+Schedule::command('inventory-imports:cleanup')->daily()->withoutOverlapping();

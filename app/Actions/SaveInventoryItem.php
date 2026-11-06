@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Models\InventoryItem;
 use App\Models\Retailer;
 use App\Models\User;
+use App\Services\InventoryCapacity;
 use App\Services\InventoryPhotos;
 use App\Services\InventoryRules;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,7 @@ class SaveInventoryItem
 {
     public function __construct(private InventoryRules $rules, private InventoryPhotos $photos) {}
 
-    public function handle(User $user, array $input, array $files = [], ?InventoryItem $item = null): InventoryItem
+    public function handle(User $user, array $input, array $files = [], ?InventoryItem $item = null, ?InventoryCapacity $capacity = null): InventoryItem
     {
         $stored = [];
         $removed = [];
@@ -22,13 +23,13 @@ class SaveInventoryItem
             foreach ($files as $file) {
                 $stored[] = $this->photos->store($file);
             }
-            $result = DB::transaction(function () use ($user, $input, $item, $stored, &$removed) {
+            $result = DB::transaction(function () use ($user, $input, $item, $stored, &$removed, $capacity) {
                 $retailer = Retailer::lockForUpdate()->findOrFail($user->retailer->id);
                 Gate::forUser($user)->authorize('operate', $retailer);
                 $current = $item ? InventoryItem::lockForUpdate()->findOrFail($item->id) : null;
                 Gate::forUser($user)->authorize($current ? 'update' : 'create', $current ?? InventoryItem::class);
                 $data = $this->rules->data($input);
-                $this->rules->validate($retailer, $data, $current);
+                $this->rules->validate($retailer, $data, $current, $capacity);
                 $published = $current && in_array($current->status->value, ['published', 'change_pending']);
                 $images = $stored ?: ($published ? ($current->proposed_images ?? $current->images->map->only(['disk', 'path'])->all()) : []);
                 if ($published) {

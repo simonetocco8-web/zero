@@ -15,6 +15,7 @@ use App\Http\Controllers\CustomerAreaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExchangeController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryImportController;
 use App\Http\Controllers\InventoryManagementController;
 use App\Http\Controllers\MarketplaceConnectController;
 use App\Http\Controllers\MarketplaceController;
@@ -65,6 +66,17 @@ Route::middleware(['auth', 'can:accessRetailerArea,'.User::class])->prefix('reta
         }
     });
     Route::middleware(EnsureApprovedRetailer::class)->group(function () {
+        Route::prefix('importazioni-giacenze')->name('imports.')->group(function () {
+            Route::get('/', [InventoryImportController::class, 'index'])->name('index');
+            Route::post('/', [InventoryImportController::class, 'store'])->middleware('throttle:10,1')->name('store');
+            Route::get('{import}', [InventoryImportController::class, 'show'])->whereNumber('import')->name('show');
+            foreach (['options', 'mapping', 'configuration', 'confirm', 'resume', 'template'] as $action) {
+                Route::post('{import}/'.$action, [InventoryImportController::class, $action])->whereNumber('import')->middleware('throttle:20,1')->name($action);
+            }
+            Route::get('{import}/file', [InventoryImportController::class, 'download'])->whereNumber('import')->name('download');
+            Route::get('{import}/report', [InventoryImportController::class, 'report'])->whereNumber('import')->name('report');
+        });
+
         Route::get('stock', [InventoryController::class, 'index'])->name('stock');
         Route::get('sell', [InventoryController::class, 'create'])->name('sell');
         Route::post('stock', [InventoryController::class, 'store'])->middleware('throttle:20,1')->name('stock.store');

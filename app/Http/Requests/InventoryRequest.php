@@ -16,6 +16,11 @@ class InventoryRequest extends FormRequest
 
     public function rules(): array
     {
+        return self::productRules($this->user()->retailer->id, $this->route('item'));
+    }
+
+    public static function productRules(int $retailerId, ?InventoryItem $item = null): array
+    {
         return [
             'name' => ['required', 'string', 'max:255'], 'brand' => ['nullable', 'string', 'max:255'], 'category_id' => ['required', 'integer', Rule::exists('categories', 'id')],
             'unit' => ['sometimes', 'required', 'string', 'max:32'],
@@ -25,7 +30,7 @@ class InventoryRequest extends FormRequest
             'vat_rate' => ['nullable', 'regex:/^[0-9]{1,3}(?:[.,][0-9]{1,2})?$/D'],
             'shipping_vat_treatment' => ['nullable', Rule::in(array_keys(config('marketplace.vat_treatments')))],
             'shipping_vat_rate' => ['nullable', 'regex:/^[0-9]{1,3}(?:[.,][0-9]{1,2})?$/D'],
-            'sku' => ['nullable', 'string', 'max:191', Rule::unique('inventory_items', 'sku')->where('retailer_id', $this->user()->retailer->id)->ignore($this->route('item')?->id)], 'ean' => ['nullable', 'string', 'max:191'],
+            'sku' => ['nullable', 'string', 'max:191', Rule::unique('inventory_items', 'sku')->where('retailer_id', $retailerId)->ignore($item?->id)], 'ean' => ['nullable', 'string', 'max:191'],
             'quantity' => ['required', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,3})?$/'],
             'zero_price' => ['required', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,2})?$/'],
             'list_price' => ['nullable', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,2})?$/'],

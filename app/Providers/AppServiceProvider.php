@@ -15,7 +15,10 @@ use App\Services\Payments\StripeConnectMarketplaceGateway;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Queue\Events\Looping;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -71,6 +74,11 @@ class AppServiceProvider extends ServiceProvider
                 $orderCount = (int) $counts->order_count;
             }
             $view->with(['marketplaceCartCount' => $cartCount, 'marketplaceOrderCount' => $orderCount]);
+        });
+        Queue::looping(function (Looping $event) {
+            if ($event->connectionName === config('inventory_imports.queue_connection') && in_array(config('inventory_imports.queue'), explode(',', $event->queue ?? ''), true)) {
+                Cache::put('inventory-import-worker:'.$event->connectionName.':'.config('inventory_imports.queue'), now()->getTimestamp(), 180);
+            }
         });
         Paginator::defaultView('pagination.accessible');
         RateLimiter::for('availability', fn (Request $request) => [Limit::perMinute(5)->by('availability-minute:'.$request->ip()), Limit::perHour(20)->by('availability-hour:'.$request->ip())]);
