@@ -23,7 +23,7 @@ class ReviewInventoryItem
         DB::transaction(function () use ($actor, $item, $decision, $reason, &$publicationId) {
             $retailer = Retailer::lockForUpdate()->findOrFail($item->retailer_id);
             $item = InventoryItem::lockForUpdate()->findOrFail($item->id);
-            if (! in_array($item->status->value, ['pending', 'change_pending'])) {
+            if (! $item->status->needsReview()) {
                 throw ValidationException::withMessages(['decision' => 'Questa giacenza non è in attesa di verifica.']);
             }
             $before = ['status' => $item->status->value];

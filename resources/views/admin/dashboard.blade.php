@@ -2,7 +2,11 @@
     <h1>Dashboard</h1>
     <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         @foreach($counts as $label => $count)
-            <x-card><p class="text-sm text-muted">{{ $label }}</p><p class="mt-2 text-2xl font-semibold">{{ $count }}</p></x-card>
+            @if($label === 'Giacenze in verifica')
+                <a href="{{ route('admin.stock', ['status' => \App\Enums\InventoryStatus::REVIEW_FILTER]) }}" class="block rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-4" aria-label="{{ $count }} Giacenze in verifica"><x-card class="h-full hover:border-brand-600"><p class="text-sm text-muted">{{ $label }}</p><p class="mt-2 text-2xl font-semibold">{{ $count }}</p><p class="mt-2 inline-flex items-center gap-2 font-semibold">Da approvare <x-icon name="arrow" /></p></x-card></a>
+            @else
+                <x-card><p class="text-sm text-muted">{{ $label }}</p><p class="mt-2 text-2xl font-semibold">{{ $count }}</p></x-card>
+            @endif
         @endforeach
     </div>
     <x-card class="mt-5">

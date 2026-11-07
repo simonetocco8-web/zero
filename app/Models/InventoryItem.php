@@ -13,6 +13,7 @@ use App\Support\DisplayMoney;
 use App\Support\MoneyMath;
 use Brick\Math\BigDecimal;
 use Database\Factories\InventoryItemFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -32,6 +33,11 @@ class InventoryItem extends Model
     protected $attributes = ['status' => 'draft', 'condition' => 'new', 'unit' => 'piece', 'currency' => 'EUR', 'pickup_available' => false, 'shipping_available' => false, 'exchange_available' => false];
 
     protected $fillable = ['length_mm', 'width_mm', 'height_mm', 'weight_g', 'units_per_parcel_milliunits', 'packing_rule', 'packaging_type', 'category_id', 'shipping_cost_cents', 'delivery_notes', 'vat_treatment', 'vat_rate_basis_points', 'shipping_vat_treatment', 'shipping_vat_rate_basis_points', 'retailer_id', 'name', 'brand', 'category', 'sku', 'ean', 'quantity', 'quantity_milliunits', 'unit', 'currency', 'list_price_cents', 'zero_price_cents', 'condition', 'province', 'pickup_available', 'shipping_available', 'exchange_available', 'description', 'status', 'reviewed_by', 'rejection_reason', 'published_at', 'external_provider', 'external_product_id'];
+
+    public function scopeAwaitingReview(Builder $query): void
+    {
+        $query->whereIn('status', InventoryStatus::reviewValues());
+    }
 
     protected function casts(): array
     {

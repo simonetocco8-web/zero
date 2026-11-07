@@ -19,6 +19,7 @@ $isActive = function ($link) {
     return true;
 };
 $isSectionActive = fn ($link) => $isActive($link) || collect($link['children'])->contains(fn ($child) => $isActive($child));
+$linkLabel=fn($l)=>$l['label'].(!empty($l['review_count'])?' ('.$inventoryReviewCount.')':'');
 $home=match($area){'admin'=>'admin.dashboard','retailer'=>'retailer.dashboard',default=>'customer.dashboard'};
 @endphp
 <!DOCTYPE html><html data-theme="light" lang="{{ str_replace('_','-',app()->getLocale()) }}"><head><x-head :title="$title" :canonical="url()->current()" robots="noindex,follow" /></head><body class="area-page"><x-theme-toggle />
@@ -30,8 +31,8 @@ $home=match($area){'admin'=>'admin.dashboard','retailer'=>'retailer.dashboard',d
             <nav aria-label="Navigazione principale" class="space-y-2">
                 @foreach($links as $link)
                     <a href="{{ $href($link) }}" class="nav-item {{ $isSectionActive($link)?'nav-active':'nav-idle' }}" @if($isActive($link) && request()->routeIs($link['route'])) aria-current="page" @endif><x-icon :name="$link['icon']" />{{ $link['label'] }}</a>
-                    @if($link['children'] && $isSectionActive($link))
-                        <ul class="ml-3 space-y-1 border-l border-white/20 pl-3">@foreach($link['children'] as $child)<li><a class="flex min-h-11 items-center break-words rounded-lg px-3 text-sm {{ $isActive($child) ? 'nav-active' : 'nav-idle' }}" href="{{ $href($child) }}" @if($isActive($child)) aria-current="page" @endif>{{ $child['label'] }}</a></li>@endforeach</ul>
+                    @if($link['children'] && ($isSectionActive($link) || ($link['children_always_visible'] ?? false)))
+                        <ul class="ml-3 space-y-1 border-l border-white/20 pl-3">@foreach($link['children'] as $child)<li><a class="flex min-h-11 items-center break-words rounded-lg px-3 text-sm {{ $isActive($child) ? 'nav-active' : 'nav-idle' }}" href="{{ $href($child) }}" @if($isActive($child)) aria-current="page" @endif>{{ $linkLabel($child) }}</a></li>@endforeach</ul>
                     @endif
                 @endforeach
             </nav>
@@ -45,7 +46,7 @@ $home=match($area){'admin'=>'admin.dashboard','retailer'=>'retailer.dashboard',d
             </div>
             <details class="pb-3 lg:hidden"><summary class="flex min-h-11 cursor-pointer items-center font-semibold">Menu {{ $area==='admin'?'amministrazione':($area==='retailer'?'rivenditore':'cliente') }}</summary><nav aria-label="Sezioni riservate" class="grid gap-2 py-3 sm:grid-cols-2">
                 @foreach($links as $link)
-                    <div><a class="flex min-h-11 items-center rounded-lg px-3 font-semibold {{ $isSectionActive($link) ? 'nav-active' : 'nav-idle' }}" @if($isActive($link) && request()->routeIs($link['route'])) aria-current="page" @endif href="{{ $href($link) }}">{{ $link['label'] }}</a>@if($isSectionActive($link))@foreach($link['children'] as $child)<a class="ml-3 flex min-h-11 items-center break-words rounded-lg px-3 text-sm {{ $isActive($child) ? 'nav-active' : 'nav-idle' }}" @if($isActive($child)) aria-current="page" @endif href="{{ $href($child) }}">{{ $child['label'] }}</a>@endforeach @endif</div>
+                    <div><a class="flex min-h-11 items-center rounded-lg px-3 font-semibold {{ $isSectionActive($link) ? 'nav-active' : 'nav-idle' }}" @if($isActive($link) && request()->routeIs($link['route'])) aria-current="page" @endif href="{{ $href($link) }}">{{ $link['label'] }}</a>@if($isSectionActive($link) || ($link['children_always_visible'] ?? false))@foreach($link['children'] as $child)<a class="ml-3 flex min-h-11 items-center break-words rounded-lg px-3 text-sm {{ $isActive($child) ? 'nav-active' : 'nav-idle' }}" @if($isActive($child)) aria-current="page" @endif href="{{ $href($child) }}">{{ $linkLabel($child) }}</a>@endforeach @endif</div>
                 @endforeach
             </nav></details>
         </header>

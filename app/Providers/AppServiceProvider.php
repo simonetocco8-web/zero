@@ -8,6 +8,7 @@ use App\Contracts\ShippingQuoteProviderInterface;
 use App\Contracts\StoreGatewayInterface;
 use App\Contracts\StripeBillingGateway;
 use App\Models\CartItem;
+use App\Models\InventoryItem;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\Billing\StripeSdkGateway;
@@ -76,6 +77,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        View::composer('components.area-shell', function ($view) {
+            $view->with('inventoryReviewCount', ($view->getData()['area'] ?? null) === 'admin' && auth()->user()?->can('accessAdministration', User::class)
+                ? InventoryItem::awaitingReview()->count() : null);
+        });
         View::composer('components.marketplace-layout', function ($view) {
             $user = auth()->user();
             $cartCount = 0;

@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\InventoryStatus;
+
 return [
     'customer' => [
         ['route' => 'customer.dashboard', 'label' => 'Marketplace', 'icon' => 'grid', 'pattern' => ['customer.dashboard', 'orders.*', 'customer.payments', 'customer.deliveries.*', 'cart.*', 'checkout.*'], 'children' => [['route' => 'orders.index', 'label' => 'I miei ordini', 'pattern' => 'orders.*'], ['route' => 'customer.payments', 'label' => 'Pagamenti'], ['route' => 'customer.deliveries.index', 'label' => 'Consegne', 'pattern' => 'customer.deliveries.*'], ['route' => 'cart.index', 'label' => 'Carrello']]],
@@ -24,7 +26,10 @@ return [
             ['route' => 'admin.categories.index', 'label' => 'Categorie', 'pattern' => 'admin.categories.*'],
             ...array_map(fn ($r, $label) => ['route' => 'admin.marketplace.index', 'label' => $label, 'pattern' => 'admin.marketplace.*', 'parameters' => ['resource' => $r]], ['orders', 'vendors', 'exchanges', 'payments', 'refunds', 'commissions', 'reservations'], ['Ordini', 'Sottoordini', 'Scambi', 'Pagamenti', 'Rimborsi', 'Commissioni', 'Stock reservations']),
         ]],
-        ['route' => 'admin.retailers', 'label' => 'Rivenditori', 'icon' => 'users', 'children' => [['route' => 'admin.stock', 'label' => 'Giacenze']]],
+        ['route' => 'admin.retailers', 'label' => 'Rivenditori', 'icon' => 'users'],
+        ['route' => 'admin.stock', 'label' => 'Giacenze', 'icon' => 'box', 'children_always_visible' => true, 'children' => [
+            ['route' => 'admin.stock', 'label' => 'In verifica', 'parameters' => ['status' => InventoryStatus::REVIEW_FILTER], 'review_count' => true],
+        ]],
         ['route' => 'admin.payouts', 'label' => 'Bonifici', 'icon' => 'wallet'],
         ['route' => 'admin.settings', 'label' => 'Impostazioni', 'icon' => 'settings'],
     ],
