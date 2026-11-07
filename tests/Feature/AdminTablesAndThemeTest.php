@@ -61,7 +61,7 @@ class AdminTablesAndThemeTest extends TestCase
         foreach (['APPROVA E PUBBLICA', 'RIFIUTA'] as $label) {
             $button = $xpath->query('//table//button[@aria-label="'.$label.'"]')->item(0);
             $this->assertNotNull($button);
-            $this->assertSame('', trim($button->textContent));
+            $this->assertSame($label, trim($button->textContent));
             $this->assertSame(1, $xpath->query('.//svg', $button)->length);
         }
         $this->assertSame(1, $xpath->query('//table//button[@aria-label="Dettaglio giacenza #'.$item->id.'"]')->length);
@@ -69,7 +69,7 @@ class AdminTablesAndThemeTest extends TestCase
         foreach ([$data['description'], 'Consegna proposta', 'SKU-PROPOSTO', 'Foto presenti: 1', 'Gestisci foto', 'Elimina articolo'] as $value) {
             $this->assertStringContainsString($value, $modal);
         }
-        $response->assertDontSee('private/never-expose.jpg')->assertDontSee('Descrizione pubblicata');
+        $response->assertDontSee('private/never-expose.jpg')->assertSee('Descrizione pubblicata');
         $this->assertSame(1, $xpath->query('//dialog//form/input[@name="_method" and @value="DELETE"]')->length);
     }
 

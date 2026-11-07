@@ -1,8 +1,9 @@
 @php
+    $comparison = app(\App\View\InventoryReviewComparison::class);
+    $rows = $comparison->rows($item);
+    $photosChanged = $comparison->photosChanged($item);
     $data = $item->proposed_data ?? $item->getAttributes();
     $publication = $item->latestPublication;
-    $proposedPhoto = $item->proposed_data && !empty($item->proposed_images);
-    $photoPosition = $proposedPhoto ? array_key_first($item->proposed_images) : $item->images->sortBy('position')->first()?->position;
     $money = fn ($key) => isset($data[$key]) ? \App\Support\DisplayMoney::euros($data[$key]) : 'Non indicato';
     $yesNo = fn ($key) => !empty($data[$key]) ? 'Sì' : 'No';
     $details = [
@@ -35,13 +36,27 @@
         'ID prodotto esterno' => $item->external_product_id ?? 'Non assegnato',
         'Negozio simulato' => $publication ? match($publication->status) { 'succeeded' => 'Completato', 'failed' => 'Errore recuperabile', 'processing' => 'In elaborazione', default => 'In attesa' } : 'Non richiesto',
     ];
+    foreach ($rows as $row) {
+        if (in_array($row['key'], ['length_mm', 'width_mm', 'height_mm', 'weight_g', 'packaging_type', 'packing_rule', 'units_per_parcel_milliunits'], true)) { $details[$row['label']] = $row['proposed']; }
+    }
 @endphp
-<x-modal name="stock-detail-{{ $item->id }}" title="Dettaglio giacenza #{{ $item->id }}">
+<x-modal name="stock-detail-{{ $item->id }}" title="Dettaglio giacenza #{{ $item->id }}" :wide="true">
     @if($item->proposed_data)<p class="mb-4 text-sm text-muted">Dati proposti in verifica.</p>@endif
-    @if($photoPosition !== null)
-        <img src="{{ route('inventory.image', [$item, $photoPosition, 'proposed' => $proposedPhoto ? 1 : 0]) }}" alt="Immagine di {{ $data['name'] }}" loading="lazy" decoding="async" class="mb-5 max-h-56 w-full rounded-xl border border-line bg-raised object-contain">
+    @if($item->proposed_data && $item->published_at)
+        <section aria-label="Fotografie delle due versioni" class="mb-6">
+            <h3 class="mb-3 font-semibold">{{ $photosChanged ? 'Fotografie modificate' : 'Fotografie invariate' }}</h3>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div><h4 class="mb-2 font-semibold">Foto proposte</h4><div class="grid grid-cols-2 gap-2">@forelse($item->proposed_images ?? [] as $position=>$photo)<img src="{{ route('inventory.image', [$item, $position, 'proposed' => 1]) }}" alt="Foto proposta {{ $loop->iteration }} di {{ $data['name'] }}" loading="lazy" decoding="async" class="aspect-square w-full rounded-xl object-contain">@empty<p>Nessuna immagine proposta: le foto pubblicate saranno rimosse solo dopo approvazione.</p>@endforelse</div></div>
+                <div><h4 class="mb-2 font-semibold">Foto pubblicate</h4><div class="grid grid-cols-2 gap-2">@forelse($item->images->sortBy('position') as $photo)<img src="{{ route('inventory.image', [$item, $photo->position, 'proposed' => 0]) }}" alt="Foto pubblicata {{ $loop->iteration }} di {{ $item->name }}" loading="lazy" decoding="async" class="aspect-square w-full rounded-xl object-contain">@empty<p>Nessuna immagine disponibile</p>@endforelse</div></div>
+            </div>
+        </section>
+        <section aria-label="Confronto delle versioni" class="mb-6">
+            <h3 class="text-lg font-semibold">Versione pubblicata e modifiche proposte</h3>
+            <p class="my-3">I campi con la dicitura «Modificato» saranno applicati soltanto dopo approvazione. In caso di rifiuto resta la versione pubblicata.</p>
+            <dl class="space-y-3">@foreach($rows as $row)<div data-review-field="{{ $row['key'] }}" data-changed="{{ $row['changed'] ? 'true' : 'false' }}" class="rounded-xl border p-3 {{ $row['changed'] ? 'border-brand-600 bg-brand-50' : 'border-line' }}"><dt class="mb-2 font-semibold">{{ $row['label'] }} @if($row['changed'])<span class="ml-2 text-sm text-brand-700">Modificato</span>@endif</dt><dd class="grid min-w-0 gap-3 sm:grid-cols-2"><div class="min-w-0"><span class="text-sm text-muted">Pubblicata</span><p data-before class="whitespace-pre-wrap break-words">{{ $row['published'] }}</p></div><div class="min-w-0"><span class="text-sm text-muted">Proposta</span><p data-after class="whitespace-pre-wrap break-words font-medium">{{ $row['proposed'] }}</p></div></dd></div>@endforeach</dl>
+        </section>
     @else
-        <p class="mb-5 rounded-xl border border-line bg-raised p-4 text-sm text-muted">Nessuna immagine disponibile</p>
+        <div class="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">@forelse($item->images->sortBy('position') as $photo)<img src="{{ route('inventory.image', [$item, $photo->position, 'proposed' => 0]) }}" alt="Foto {{ $loop->iteration }} di {{ $data['name'] }}" loading="lazy" decoding="async" class="aspect-square w-full rounded-xl object-contain">@empty<p>Nessuna immagine disponibile</p>@endforelse</div>
     @endif
     <dl class="grid min-w-0 gap-4 sm:grid-cols-2">
         @foreach($details as $label => $value)
@@ -56,6 +71,10 @@
         @if($item->rejection_reason)<div><dt class="font-semibold">Motivo di rifiuto</dt><dd class="whitespace-pre-wrap break-words">{{ $item->rejection_reason }}</dd></div>@endif
     </dl>
     <div class="mt-6 flex flex-wrap gap-3 border-t border-line pt-4">
+        @if($item->status->needsReview()) @can('review', $item)
+            <x-button type="button" x-on:click="$dispatch('open-modal', 'stock-approve-{{ $item->id }}')"><x-icon name="check-circle" /> APPROVA E PUBBLICA</x-button>
+            <x-button type="button" variant="danger" x-on:click="$dispatch('open-modal', 'stock-reject-{{ $item->id }}')"><x-icon name="x-circle" /> RIFIUTA</x-button>
+        @endcan @endif
         @can('managePhotos', $item)<x-button variant="secondary" :href="route('inventory.photos.edit', $item)">Gestisci foto</x-button>@endcan
         @can('delete', $item)<x-button type="button" variant="danger" x-on:click="$dispatch('open-modal', 'delete-item-{{ $item->id }}')">Elimina articolo</x-button>@endcan
         <x-button type="button" variant="secondary" x-on:click="close()">Chiudi</x-button>

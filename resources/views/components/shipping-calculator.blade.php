@@ -1,5 +1,5 @@
 @props(['item' => null, 'retailerId' => null])
-<div x-data="{ busy: false, error: '', rates: [], informational: false, selected: '', alternate: false,
+<div class="flex" x-data="{ busy: false, error: '', rates: [], informational: false, selected: '', alternate: false,
  async calculate() {
     this.busy = true; this.error = ''; this.rates = []; this.selected = '';
     const form = new FormData(this.$refs.calculation);
@@ -14,7 +14,7 @@
     } catch (error) { this.error = error.message || 'Connessione non disponibile. Riprova.'; }
     finally { this.busy = false; }
  }}">
-<button type="button" class="btn btn-secondary min-h-11" x-ref="opener" @click="$refs.dialog.showModal()">Calcola Spedizione</button>
+<x-button type="button" variant="secondary" data-shipping-trigger x-ref="opener" @click="$refs.dialog.showModal()"><x-icon name="truck" /> Calcola Spedizione</x-button>
 <dialog x-ref="dialog" @close="$refs.opener.focus()" class="m-auto max-h-[90dvh] w-[min(95vw,42rem)] overflow-y-auto rounded-xl border border-white/20 bg-slate-900 p-5 text-white backdrop:bg-black/70" aria-label="Calcola Spedizione">
 <div class="flex items-center justify-between gap-3"><h2>Calcola Spedizione</h2><button class="min-h-11 px-3" type="button" @click="$refs.dialog.close()" aria-label="Chiudi calcolatore">Chiudi</button></div>
 @if($item)<p class="my-3 font-semibold">{{ $item->name }}</p><p>Imballaggio: {{ $item->length_mm ?? '—' }} × {{ $item->width_mm ?? '—' }} × {{ $item->height_mm ?? '—' }} mm · {{ $item->weight_g ?? '—' }} g per collo.</p><p>Partenza: {{ $item->retailer->city }} · {{ $item->retailer->province }}.</p>@endif

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\InventoryStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
@@ -10,7 +11,11 @@ class AdminFilters
     public function apply(Builder $query, array $filters, bool $retailers = false, bool $inventory = false): Builder
     {
         if (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+            if ($inventory && $filters['status'] === InventoryStatus::REVIEW_FILTER) {
+                $query->awaitingReview();
+            } else {
+                $query->where('status', $filters['status']);
+            }
         }
         if (! empty($filters['company'])) {
             $company = $filters['company'];

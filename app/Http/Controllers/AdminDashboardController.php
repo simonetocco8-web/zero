@@ -12,6 +12,6 @@ class AdminDashboardController extends Controller
 {
     public function __invoke()
     {
-        return view('admin.dashboard', ['counts' => ['Rivenditori in verifica' => Retailer::where('status', 'pending')->count(), 'Giacenze in verifica' => InventoryItem::whereIn('status', ['pending', 'change_pending'])->count(), 'Bonifici in attesa' => PayoutRequest::where('status', 'pending')->count(), 'Pubblicazioni da recuperare' => StorePublication::whereIn('status', ['pending', 'failed'])->count()], 'logs' => AuditLog::with('actor')->latest()->limit(10)->get()]);
+        return view('admin.dashboard', ['counts' => ['Rivenditori in verifica' => Retailer::where('status', 'pending')->count(), 'Giacenze in verifica' => InventoryItem::awaitingReview()->count(), 'Bonifici in attesa' => PayoutRequest::where('status', 'pending')->count(), 'Pubblicazioni da recuperare' => StorePublication::whereIn('status', ['pending', 'failed'])->count()], 'logs' => AuditLog::with('actor')->latest()->limit(10)->get()]);
     }
 }
