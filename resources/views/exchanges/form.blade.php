@@ -2,7 +2,12 @@
     <h1>{{ $exchange ? 'Nuova controproposta' : 'Proponi uno scambio' }}</h1>
     <p class="my-4">Seleziona i prodotti di entrambi i lati e indica i valori unitari concordati delle merci. Trasporto, IVA e commissioni sono voci separate. La proposta richiederà due accettazioni del riepilogo e non riserva ancora quantità.</p>
     @if($errors->any())<x-alert variant="danger"><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></x-alert>@endif
-    <form method="POST" action="{{ $exchange ? route('retailer.exchanges.counter',$exchange) : route('retailer.exchanges.store') }}" class="space-y-6">
+    <form x-ref="exchangeForm" x-data="{ busy:false, error:'', sides:{a:[],b:[]}, selected:{a:'',b:''},
+async quoteShipping() { this.busy=true; this.error=''; this.sides={a:[],b:[]};this.selected={a:'',b:''};
+try { const response=await fetch(@js($exchange ? route('retailer.exchanges.shipping.counter',$exchange) : route('retailer.exchanges.shipping')), {method:'POST',headers:{'Accept':'application/json','X-CSRF-TOKEN':@js(csrf_token())},body:new FormData(this.$refs.exchangeForm)});const data=await response.json(); if(!response.ok) throw new Error(Object.values(data.errors||{}).flat().join(' ')||'Quotazione non disponibile');this.sides=data.sides;
+if(!this.sides.a.length &amp;&amp; !this.sides.b.length) this.error='Nessuna tariffa disponibile: verifica modalità e dati di partenza.';
+} catch(e) {this.error=e.message;} finally {this.busy=false;}
+}}" @change="if(!$event.target.name.includes('shipping_quote_id')) {sides={a:[],b:[]};selected={a:'',b:''};}" method="POST" action="{{ $exchange ? route('retailer.exchanges.counter',$exchange) : route('retailer.exchanges.store') }}" class="space-y-6">
         @csrf
         <input type="hidden" name="selection_mode" value="checkboxes">
         <input type="hidden" name="key" value="{{ old('key',$key) }}">
@@ -42,17 +47,19 @@
                         @endforelse
                     </fieldset>
                     @php($delivery=$side==='a' ? $version?->delivery_a : $version?->delivery_b)
+                    @if(config('shipping.enabled'))<div class="my-4"><input type="hidden" name="delivery[{{ $side }}][shipping_quote_id]" :value="selected.{{ $side }}"><template x-for="quote in sides.{{ $side }}" :key="quote.id"><label class="flex min-h-11 items-center gap-3"><input type="radio" x-model="selected.{{ $side }}" :value="quote.id" name="shipping_quote_id_{{ $side }}"><span x-text="quote.rate.carrier+' · '+quote.rate.service+' · '+(quote.rate.final_cents/100).toLocaleString('it-IT',{style:'currency',currency:'EUR'})"></span></label></template></div>@endif
                     <fieldset class="mt-6 space-y-3">
                         <legend class="field-label">Consegna delle merci {{ strtoupper($side) }} alla controparte</legend>
                         <label class="block"><span class="field-label">Modalità</span><select class="field" name="delivery[{{ $side }}][mode]">@foreach(['pickup'=>'Ritiro presso il proprietario','shipping'=>'Spedizione alla controparte'] as $value=>$label)<option value="{{ $value }}" @selected(old('delivery.'.$side.'.mode',$delivery['mode']??'pickup')===$value)>{{ $label }}</option>@endforeach</select></label>
                         <label class="block"><span class="field-label">Costo trasporto separato (€)</span><input class="field" name="delivery[{{ $side }}][cost]" inputmode="decimal" value="{{ old('delivery.'.$side.'.cost',(string)\Brick\Math\BigDecimal::of($delivery['shipping_cost_cents']??0)->dividedBy(100,2)) }}" required></label>
                         <label class="block"><span class="field-label">Chi paga il trasporto</span><select class="field" name="delivery[{{ $side }}][payer_side]">@foreach(['a'=>'A','b'=>'B'] as $payer=>$label)<option value="{{ $payer }}" @selected(old('delivery.'.$side.'.payer_side',$delivery['payer_side']??($side==='a'?'b':'a'))===$payer)>{{ $label }}</option>@endforeach</select></label>
-                        <label class="block"><span class="field-label">Pagamento trasporto</span><select class="field" name="delivery[{{ $side }}][settlement]"><option value="external" @selected(old('delivery.'.$side.'.settlement',$delivery['settlement']??'external')==='external')>Al vettore, separatamente</option><option value="sender" @selected(old('delivery.'.$side.'.settlement',$delivery['settlement']??'external')==='sender')>Rimborso al mittente nel conguaglio</option></select></label>
+                        <label class="block"><span class="field-label">Pagamento trasporto</span><select class="field" name="delivery[{{ $side }}][settlement]"><option value="external" @selected(old('delivery.'.$side.'.settlement',$delivery['settlement']??'external')==='external')>Al vettore, separatamente</option><option value="sender" @selected(old('delivery.'.$side.'.settlement',$delivery['settlement']??'external')==='sender')>Rimborso al mittente separato dal conguaglio merci</option></select></label>
                         <label class="block"><span class="field-label">Destinazione concordata (obbligatoria per spedizione)</span><textarea class="field" name="delivery[{{ $side }}][destination]" maxlength="1000" rows="3">{{ old('delivery.'.$side.'.destination',$delivery['destination']??'') }}</textarea></label>
                     </fieldset>
                 </x-card>
             @endforeach
         </div>
+        @if(config('shipping.enabled'))<x-alert>Le due spedizioni sono quotate separatamente verso il profilo aziendale della controparte. I preventivi sono informativi fino alla verifica fiscale e di incasso. Il conguaglio merci resta separato.</x-alert><button type="button" class="btn btn-secondary min-h-11" :disabled="busy" @click="quoteShipping" x-text="busy ? 'Calcolo…' : 'Calcola i due trasporti'"></button><p role="alert" x-text="error"></p>@endif
         <label class="block"><span class="field-label">Note concordate (facoltative)</span><textarea class="field" name="notes" maxlength="2000" rows="3">{{ old('notes',$version?->notes) }}</textarea></label>
         <div class="flex flex-wrap gap-3"><x-button type="submit">{{ $exchange ? 'Crea nuova versione' : 'Invia proposta' }}</x-button><x-button variant="secondary" :href="$exchange ? route('retailer.exchanges.show',$exchange) : route('marketplace.show',$requested)">Torna indietro</x-button></div>
     </form>

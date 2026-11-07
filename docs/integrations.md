@@ -149,3 +149,7 @@ oltre TTL non viene più chiuso automaticamente per aprirne un altro: la scadenz
 locale non dimostra che Stripe non abbia incassato. Occorre riconciliazione del
 provider prima di segnare esplicitamente expired e consentire un nuovo checkout.
 Riconciliare anche i record storici expired delle release precedenti.
+
+## Quotazioni trasporto Paccofacile — 7 novembre 2026
+
+Architettura e percorso fake implementati; provider reale e checkout dinamico bloccati in attesa di contratto ufficiale, sandbox e verifica fiscale/incasso. Nessuna etichetta o prenotazione. Audit, transizione legacy, configurazione e attivazione in [shipping-quotes.md](shipping-quotes.md).

@@ -14,6 +14,7 @@ use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CustomerAreaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExchangeController;
+use App\Http\Controllers\ExchangeShippingQuoteController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryImportController;
 use App\Http\Controllers\InventoryManagementController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\MarketplaceOrderController;
 use App\Http\Controllers\RetailerBankVerificationController;
 use App\Http\Controllers\RetailerController;
 use App\Http\Controllers\RetailerSalesController;
+use App\Http\Controllers\ShippingQuoteController;
 use App\Http\Middleware\EnsureApprovedRetailer;
 use App\Http\Middleware\EnsureMarketplaceAccess;
 use App\Models\User;
@@ -31,6 +33,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [MarketplaceController::class, 'home'])->name('home');
 Route::middleware(['auth', EnsureMarketplaceAccess::class])->group(function () {
+    Route::post('marketplace/spedizione', [ShippingQuoteController::class, 'store'])->middleware(['can:purchase,'.User::class, 'throttle:10,1'])->name('shipping.quote');
+    Route::post('marketplace/spedizione/seleziona', [ShippingQuoteController::class, 'select'])->middleware(['can:purchase,'.User::class, 'throttle:10,1'])->name('shipping.select');
     Route::get('marketplace', [MarketplaceController::class, 'index'])->name('marketplace.index');
     Route::get('marketplace/categoria/{category:slug}', [MarketplaceController::class, 'index'])->name('marketplace.category');
     Route::get('marketplace/prodotto/{item}', [MarketplaceController::class, 'show'])->whereNumber('item')->name('marketplace.show');
@@ -57,6 +61,8 @@ Route::middleware(['auth', 'can:accessRetailerArea,'.User::class])->prefix('reta
     Route::prefix('scambi')->name('exchanges.')->group(function () {
         Route::get('/', [ExchangeController::class, 'index'])->name('index');
         Route::get('crea/{item}', [ExchangeController::class, 'create'])->name('create');
+        Route::post('quotazione', ExchangeShippingQuoteController::class)->middleware('throttle:10,1')->name('shipping');
+        Route::post('{exchange}/quotazione', ExchangeShippingQuoteController::class)->middleware('throttle:10,1')->name('shipping.counter');
         Route::post('/', [ExchangeController::class, 'store'])->middleware('throttle:20,1')->name('store');
         Route::get('{exchange}', [ExchangeController::class, 'show'])->name('show');
         Route::get('{exchange}/controproposta', [ExchangeController::class, 'edit'])->name('edit');
@@ -99,6 +105,8 @@ Route::middleware(['auth', 'can:accessRetailerArea,'.User::class])->prefix('reta
 
 Route::middleware(['auth', 'can:accessAdministration,'.User::class])->prefix('admin')->name('admin.')->group(function (): void {
     Route::resource('categories', CategoryController::class)->except('show')->middleware('throttle:60,1');
+    Route::post('marketplace/spedizione', [ShippingQuoteController::class, 'store'])->middleware(['can:purchase,'.User::class, 'throttle:10,1'])->name('shipping.quote');
+    Route::post('marketplace/spedizione/seleziona', [ShippingQuoteController::class, 'select'])->middleware(['can:purchase,'.User::class, 'throttle:10,1'])->name('shipping.select');
     Route::get('marketplace', [AdminMarketplaceController::class, 'overview'])->name('marketplace.overview');
     Route::get('marketplace/ordini/{order}', [AdminMarketplaceController::class, 'order'])->name('marketplace.orders.show');
     Route::get('marketplace/sottoordini/{vendorOrder}', [AdminMarketplaceController::class, 'vendor'])->name('marketplace.vendors.show');

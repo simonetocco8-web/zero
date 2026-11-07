@@ -6,6 +6,7 @@ use App\Models\InventoryItem;
 use App\Models\Plan;
 use App\Models\Retailer;
 use App\Models\User;
+use App\Services\Shipping\ShippingQuoteService;
 use App\Support\MoneyMath;
 use Brick\Math\BigDecimal;
 use Brick\Math\BigInteger;
@@ -42,7 +43,7 @@ class ExchangeRules
         }
     }
 
-    public function proposal(array $input, Retailer $a, Retailer $b, $products, array $plans, $expiry): array
+    public function proposal(array $input, Retailer $a, Retailer $b, $products, array $plans, $expiry, ?User $actor = null): array
     {
         app(MarketplaceEconomicRules::class)->exchange();
         $rows = [];
@@ -90,7 +91,19 @@ class ExchangeRules
             $d = $input['delivery'][$side] ?? [];
             $mode = $d['mode'] ?? null;
             $cost = $this->money($d['cost'] ?? '0');
+            $selectedShipping = null;
             $destination = trim((string) ($d['destination'] ?? ''));
+            if (config('shipping.enabled') && $mode === 'shipping') {
+                $shipping = app(ShippingQuoteService::class);
+                if (! $actor || empty($d['shipping_quote_id'])) {
+                    $shipping->fail('Calcola e seleziona una tariffa distinta per ogni lato dello scambio.');
+                }
+                $recipient = $side === 'a' ? $b : $a;
+                $shipment = array_map(fn ($line) => ['product' => $products->get($line['inventory_item_id']), 'quantity_milliunits' => $line['quantity_milliunits']], array_values(array_filter($rows, fn ($line) => $line['side'] === $side)));
+                $selectedShipping = $shipping->valid($actor, $d['shipping_quote_id'], $owner, $shipment, $shipping->origin($recipient), 'exchange:'.$input['key'].':'.$side, true);
+                $cost = $selectedShipping->rate['final_cents'];
+                $destination = $recipient->company_name.' · '.$recipient->city.' · '.$recipient->province;
+            }
             if (strlen($destination) > 1000 || ($mode === 'shipping' && $destination === '')) {
                 $this->fail('delivery', 'Indica la destinazione concordata della spedizione.');
             }
@@ -102,7 +115,7 @@ class ExchangeRules
             if (! in_array($payer, ['a', 'b'], true) || ! in_array($settlement, ['external', 'sender'], true)) {
                 $this->fail('delivery', 'Condizioni di trasporto non valide.');
             }
-            $delivery[$side] = ['payer_side' => $payer, 'payer_retailer_id' => $payer === 'a' ? $a->id : $b->id, 'recipient_side' => $side === 'a' ? 'b' : 'a', 'settlement' => $settlement, 'shipping_tax_snapshot' => ['taxable_cents' => null, 'rate_basis_points' => null, 'tax_cents' => null, 'gross_cents' => $cost === 0 ? 0 : null], 'mode' => $mode, 'shipping_cost_cents' => $cost, 'destination' => $mode === 'shipping' ? $destination : $owner->company_name.' · '.$owner->city.' · '.$owner->province];
+            $delivery[$side] = ['shipping_quote' => $selectedShipping ? ['id' => $selectedShipping->id, 'owner_user_id' => $actor->id, 'context' => $selectedShipping->context, 'rate' => $selectedShipping->rate, 'fingerprint' => $selectedShipping->fingerprint, 'shipment' => $selectedShipping->request_snapshot, 'expires_at' => $selectedShipping->expires_at->toIso8601String()] : null, 'payer_side' => $payer, 'payer_retailer_id' => $payer === 'a' ? $a->id : $b->id, 'recipient_side' => $side === 'a' ? 'b' : 'a', 'settlement' => $settlement, 'shipping_tax_snapshot' => ['taxable_cents' => null, 'rate_basis_points' => null, 'tax_cents' => null, 'gross_cents' => $cost === 0 ? 0 : null], 'mode' => $mode, 'shipping_cost_cents' => $cost, 'destination' => $mode === 'shipping' ? $destination : $owner->company_name.' · '.$owner->city.' · '.$owner->province];
             $provisional = $provisional || $cost > 0;
         }
         $goodsA = $flowTax['a']['gross_cents'] ?? $values['a']->toInt();

@@ -7,6 +7,7 @@ use App\Models\InventoryItem;
 use App\Models\Plan;
 use App\Models\Retailer;
 use App\Models\User;
+use App\Services\Shipping\ShippingQuoteService;
 use App\Support\MoneyMath;
 use Brick\Math\BigInteger;
 use Illuminate\Support\Facades\DB;
@@ -46,10 +47,13 @@ class MarketplaceQuote
                 $p->setRelation('retailer', Retailer::lockForUpdate()->findOrFail($p->retailer_id));
             }$mode = $modes[$p->retailer_id] ?? $item->delivery_mode;
             $this->carts->validate($user, $p, $item->quantity_milliunits, $mode);
+            if ($mode === 'shipping' && ! config('shipping.enabled') && ($item->shipping_quote_id || $item->shipping_pricing_mode === 'dynamic')) {
+                $this->carts->fail('shipping', 'Quotazione dinamica sospesa. Scegli il ritiro o attendi la riattivazione; nessuna tariffa manuale sostitutiva.');
+            }
             if ($mode === 'shipping' && ! $address) {
                 $this->carts->fail('address_id', 'Scegli o aggiungi un indirizzo per la spedizione.');
             }
-            if ($mode === 'shipping' && $p->shipping_cost_cents === null) {
+            if ($mode === 'shipping' && ! config('shipping.enabled') && $p->shipping_cost_cents === null) {
                 $this->carts->fail('delivery_mode', 'Il costo di consegna deve essere definito dal rivenditore prima del checkout.');
             }
             $subscriptionQuery = $p->retailer->activeSubscription()->with('plan');
@@ -64,13 +68,33 @@ class MarketplaceQuote
                 $planQuery->sharedLock();
             }$plan = $planQuery->findOrFail($sub->plan_id);
             $gross = MoneyMath::lineTotalCents($p->zero_price_cents, $item->quantity_milliunits);
+            $selectedShipping = null;
             $cost = $mode === 'shipping' ? $p->shipping_cost_cents : 0;
+            if ($mode === 'shipping' && config('shipping.enabled')) {
+                $shippingService = app(ShippingQuoteService::class);
+                $shippingService->checkoutAllowed();
+                $shipmentItems = $items->filter(fn ($row) => $row->product->retailer_id === $p->retailer_id);
+                $references = $shipmentItems->pluck('shipping_quote_id')->unique();
+                if ($references->count() !== 1 || ! $references->first()) {
+                    $shippingService->fail('Scegli una tariffa per tutti i prodotti del rivenditore.');
+                }
+                $shipment = $shipmentItems->map(fn ($row) => ['product' => $locking ? InventoryItem::lockForUpdate()->findOrFail($row->inventory_item_id) : $row->product, 'quantity_milliunits' => $row->quantity_milliunits])->all();
+                $selectedShipping = $shippingService->valid($user, $references->first(), $p->retailer, $shipment, $address->toArray(), 'sale', $locking);
+                $cost = $item->id === $shipmentItems->first()->id ? $selectedShipping->rate['final_cents'] : 0;
+            }
             $treatment = $p->vat_treatment;
             $taxes = app(MarketplaceTaxSnapshot::class);
             $fiscal = $taxes->amount($gross, $treatment, $p->vat_rate_basis_points, $p->vatLabel());
             $shippingFiscal = $cost === 0
                 ? $taxes->amount(0, 'not_applicable', null, $mode === 'pickup' ? 'Ritiro senza trasporto' : 'Spedizione gratuita')
                 : $taxes->amount($cost, $p->shipping_vat_treatment, $p->shipping_vat_rate_basis_points, config('marketplace.vat_treatments.'.$p->shipping_vat_treatment) ?? 'IVA da definire');
+            if ($selectedShipping && $cost > 0) {
+                // final_cents is the final gross customer amount, never add VAT a second time.
+                $shippingFiscal = $taxes->amount($cost, ($selectedShipping->rate['tax_treatment'] ?? null) === 'not_applicable' ? 'not_applicable' : 'included', $selectedShipping->rate['tax_rate_basis_points'] ?? null, 'Trasporto quotato');
+                if (! in_array($selectedShipping->rate['tax_treatment'] ?? null, ['included', 'not_applicable'], true)) {
+                    $shippingService->fail('Trattamento fiscale della tariffa non verificato.');
+                }
+            }
             $shippingFiscal['input_amount_cents'] = $cost;
             $cost = $shippingFiscal['gross_cents'] ?? $cost;
             $base = $fiscal['taxable_cents'];
@@ -79,7 +103,7 @@ class MarketplaceQuote
             $due = $fiscal['gross_cents'] ?? $gross;
             $commissionRate = app(MarketplaceCommission::class)->saleRate($plan->code);
             $uncertain = $fiscal['provisional'] || $shippingFiscal['provisional'];
-            $line = ['inventory_item_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit' => $p->unit, 'unit_price_cents' => $p->zero_price_cents, 'quantity_milliunits' => $item->quantity_milliunits, 'subtotal_cents' => $gross, 'shipping_cost_cents' => $cost, 'tax_cents' => $tax, 'taxable_cents' => $taxable, 'total_cents' => BigInteger::of($due)->plus($cost)->toInt(), 'commission_basis_points' => $commissionRate, 'commission_cents' => $uncertain ? null : MoneyMath::commissionCents($base, $commissionRate), 'tax_snapshot' => array_replace($fiscal, ['provisional' => $uncertain]) + ['policy' => 'explicit_product_vat_v1', 'input_amount_cents' => $gross, 'issuer_retailer_id' => $p->retailer_id, 'shipping_tax' => $shippingFiscal, 'commission_base_cents' => $base], 'product_snapshot' => ['brand' => $p->brand, 'ean' => $p->ean, 'category' => $p->categoryRecord?->name ?? $p->category, 'retailer_name' => $p->retailer->company_name, 'delivery_notes' => $p->delivery_notes, 'available_quantity_milliunits' => app(StockReservations::class)->available($p), 'pickup_available' => $p->pickup_available, 'shipping_available' => $p->shipping_available]];
+            $line = ['inventory_item_id' => $p->id, 'name' => $p->name, 'sku' => $p->sku, 'unit' => $p->unit, 'unit_price_cents' => $p->zero_price_cents, 'quantity_milliunits' => $item->quantity_milliunits, 'subtotal_cents' => $gross, 'shipping_cost_cents' => $cost, 'tax_cents' => $tax, 'taxable_cents' => $taxable, 'total_cents' => BigInteger::of($due)->plus($cost)->toInt(), 'commission_basis_points' => $commissionRate, 'commission_cents' => $uncertain ? null : MoneyMath::commissionCents($base, $commissionRate), 'tax_snapshot' => array_replace($fiscal, ['provisional' => $uncertain]) + ['policy' => 'explicit_product_vat_v1', 'input_amount_cents' => $gross, 'issuer_retailer_id' => $p->retailer_id, 'shipping_tax' => $shippingFiscal, 'commission_base_cents' => $base], 'product_snapshot' => ['shipping_quote' => $selectedShipping ? ['id' => $selectedShipping->id, 'fingerprint' => $selectedShipping->fingerprint, 'rate' => $selectedShipping->rate, 'parcels' => $selectedShipping->request_snapshot['parcels'], 'origin' => $selectedShipping->request_snapshot['origin']] : null, 'brand' => $p->brand, 'ean' => $p->ean, 'category' => $p->categoryRecord?->name ?? $p->category, 'retailer_name' => $p->retailer->company_name, 'delivery_notes' => $p->delivery_notes, 'available_quantity_milliunits' => app(StockReservations::class)->available($p), 'pickup_available' => $p->pickup_available, 'shipping_available' => $p->shipping_available]];
             if (! isset($groups[$p->retailer_id])) {
                 $groups[$p->retailer_id] = ['retailer_id' => $p->retailer_id, 'retailer_snapshot' => ['seller_role' => 'merchandise_seller', 'id' => $p->retailer_id, 'name' => $p->retailer->company_name, 'vat_number' => $p->retailer->vat_number, 'city' => $p->retailer->city], 'delivery_mode' => $mode, 'address_snapshot' => $mode === 'shipping' ? $address->only(['recipient_name', 'company', 'address_line_1', 'address_line_2', 'postal_code', 'city', 'province', 'country_code', 'phone']) : null, 'items' => [], 'subtotal_cents' => 0, 'shipping_cents' => 0, 'tax_cents' => 0, 'taxable_cents' => 0, 'total_cents' => 0, 'totals_provisional' => false, 'funds_flow_snapshot' => ['policy' => 'approved_sales_v1', 'merchandise_seller_id' => $p->retailer_id, 'commission_basis_points' => $commissionRate, 'commission_base' => 'taxable_goods_excluding_shipping_existing_convention', 'commission_tax' => ['issuer' => 'ZeroMagazzino', 'recipient_retailer_id' => $p->retailer_id, 'rate_basis_points' => null, 'tax_cents' => null, 'gross_cents' => null], 'shipping_payer' => 'buyer', 'psp_cost_cents' => null]];
             }

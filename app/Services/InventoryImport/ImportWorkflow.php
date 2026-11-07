@@ -16,6 +16,7 @@ use App\Models\Retailer;
 use App\Models\User;
 use App\Services\InventoryCapacity;
 use App\Services\InventoryRules;
+use App\Services\Shipping\ShippingPackaging;
 use Brick\Math\BigInteger;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -46,7 +47,7 @@ class ImportWorkflow
         if (! $compatible) {
             unset($settings['mapping'], $settings['category_links']);
         }
-        $settings = array_replace($settings, ['delimiter' => $parsed['delimiter'], 'encoding' => $parsed['encoding'], 'blank_rows' => $parsed['blank_rows'], 'template_compatible' => $compatible]);
+        $settings = array_replace($settings, ['shipping_packaging_required' => (bool) config('shipping.enabled'), 'delimiter' => $parsed['delimiter'], 'encoding' => $parsed['encoding'], 'blank_rows' => $parsed['blank_rows'], 'template_compatible' => $compatible]);
         unset($settings['template_id'], $settings['headers']);
         $path = 'inventory-imports/'.Str::uuid().'.csv';
         if (! Storage::disk('local')->put($path, $bytes)) {
@@ -78,7 +79,7 @@ class ImportWorkflow
             Gate::forUser($user)->authorize('update', $import);
             abort_unless($import->editable() && $import->path, 409);
             $parsed = $this->reader->read(Storage::disk('local')->get($import->path), $settings);
-            $settings = array_replace($settings, ['delimiter' => $parsed['delimiter'], 'encoding' => $parsed['encoding'], 'blank_rows' => $parsed['blank_rows']]);
+            $settings = array_replace($settings, ['shipping_packaging_required' => $import->settings['shipping_packaging_required'] ?? false, 'delimiter' => $parsed['delimiter'], 'encoding' => $parsed['encoding'], 'blank_rows' => $parsed['blank_rows']]);
             $import->rows()->delete();
             foreach (array_chunk($parsed['records'], 100, true) as $records) {
                 $rows = [];
@@ -201,8 +202,8 @@ class ImportWorkflow
                             }
                             $target = $matches[0];
                         }
-                        $this->validateInput($user, $data, $target, $snapshot->categories);
-                        $normalized = $this->rules->data($data, $snapshot->categories->get($data['category_id']));
+                        $this->validateInput($user, $data, $target, $snapshot->categories, $import->settings['shipping_packaging_required'] ?? false);
+                        $normalized = $this->rules->data($data, $snapshot->categories->get($data['category_id']), $import->settings['shipping_packaging_required'] ?? false);
                         $this->rules->validate($retailer, $normalized, $target, $capacity, $snapshot);
                         $capacity->accept($normalized, $target);
                         if (! $target) {
@@ -228,9 +229,9 @@ class ImportWorkflow
         });
     }
 
-    public function validateInput(User $user, array $data, ?InventoryItem $target, ?Collection $categories = null): void
+    public function validateInput(User $user, array $data, ?InventoryItem $target, ?Collection $categories = null, ?bool $packagingRequired = null): void
     {
-        $rules = InventoryRequest::productRules($user->retailer->id, $target);
+        $rules = array_replace(InventoryRequest::productRules($user->retailer->id, $target), ShippingPackaging::rules($packagingRequired ?? (bool) config('shipping.enabled')));
         // Preview already resolves persisted SKU through a collation-aware query and the pending-SKU index.
         // Writes always keep the live database validators.
         if ($categories !== null) {
@@ -296,10 +297,10 @@ class ImportWorkflow
                         if ($target && ! in_array(InventoryCapacity::skuKey($data['sku'] ?? ''), array_map(InventoryCapacity::skuKey(...), [$target->sku ?? '', $target->proposed_data['sku'] ?? '']), true)) {
                             $this->fail('sku', 'Il codice dell’articolo è cambiato dopo l’anteprima. Ripeti l’importazione con i dati aggiornati.');
                         }
-                        $this->validateInput($user, $data, $target);
-                        $item = app(SaveInventoryItem::class)->handle($user, $data, [], $target, $capacity);
+                        $this->validateInput($user, $data, $target, packagingRequired: $import->settings['shipping_packaging_required'] ?? false);
+                        $item = app(SaveInventoryItem::class)->handle($user, $data, [], $target, $capacity, $import->settings['shipping_packaging_required'] ?? false);
                         $row->update(['inventory_item_id' => $item->id, 'status' => $target ? 'updated' : 'created', 'processed_at' => now(), 'errors' => null]);
-                        $capacity->accept($this->rules->data($data), $target);
+                        $capacity->accept($this->rules->data($data, packagingRequired: $import->settings['shipping_packaging_required'] ?? false), $target);
                     });
                 } catch (ValidationException $e) {
                     $row->update(['status' => 'error', 'errors' => $e->errors(), 'processed_at' => now()]);

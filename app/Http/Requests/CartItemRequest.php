@@ -14,6 +14,6 @@ class CartItemRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['quantity' => ['required', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,3})?$/D'], 'delivery_mode' => ['required', 'in:pickup,shipping'], 'price' => ['prohibited'], 'unit_price_cents' => ['prohibited'], 'total_cents' => ['prohibited']];
+        return ['shipping_quote_id' => ['nullable', 'uuid'], 'quantity' => ['required', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,3})?$/D'], 'delivery_mode' => ['required', 'in:pickup,shipping'], 'price' => ['prohibited'], 'unit_price_cents' => ['prohibited'], 'total_cents' => ['prohibited']];
     }
 }

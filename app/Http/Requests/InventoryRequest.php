@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\InventoryCondition;
 use App\Models\InventoryItem;
+use App\Services\Shipping\ShippingPackaging;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -21,7 +22,7 @@ class InventoryRequest extends FormRequest
 
     public static function productRules(int $retailerId, ?InventoryItem $item = null): array
     {
-        return [
+        return ShippingPackaging::rules((bool) config('shipping.enabled')) + [
             'name' => ['required', 'string', 'max:255'], 'brand' => ['nullable', 'string', 'max:255'], 'category_id' => ['required', 'integer', Rule::exists('categories', 'id')],
             'unit' => ['sometimes', 'required', 'string', 'max:32'],
             'shipping_cost' => ['nullable', 'regex:/^[0-9]{1,9}(?:[.,][0-9]{1,2})?$/'],

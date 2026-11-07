@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Contracts\ExchangePaymentGatewayInterface;
 use App\Contracts\MarketplacePaymentGatewayInterface;
+use App\Contracts\ShippingQuoteProviderInterface;
 use App\Contracts\StoreGatewayInterface;
 use App\Contracts\StripeBillingGateway;
 use App\Models\CartItem;
@@ -12,6 +13,8 @@ use App\Models\User;
 use App\Services\Billing\StripeSdkGateway;
 use App\Services\Payments\FakeMarketplacePaymentGateway;
 use App\Services\Payments\StripeConnectMarketplaceGateway;
+use App\Services\Shipping\FakeShippingProvider;
+use App\Services\Shipping\PaccofacileShippingProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
@@ -22,6 +25,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\ValidationException;
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\CurlClient;
 use Stripe\StripeClient;
@@ -33,6 +37,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(ShippingQuoteProviderInterface::class, function () {
+            if (config('shipping.provider') === 'fake' && app()->environment('testing')) {
+                return new FakeShippingProvider;
+            }
+
+            if (config('shipping.provider') !== 'paccofacile') {
+                throw ValidationException::withMessages(['shipping' => 'Provider di spedizione non configurato.']);
+            }
+
+            return new PaccofacileShippingProvider;
+        });
         $this->app->bind(MarketplacePaymentGatewayInterface::class, fn () => $this->app->make(config('marketplace.economic_rules.execution_mode') === 'stripe_connect' ? StripeConnectMarketplaceGateway::class : FakeMarketplacePaymentGateway::class));
         $this->app->bind(ExchangePaymentGatewayInterface::class, fn () => $this->app->make(config('marketplace.economic_rules.execution_mode') === 'stripe_connect' ? StripeConnectMarketplaceGateway::class : FakeMarketplacePaymentGateway::class));
         $this->app->bind(StoreGatewayInterface::class, function () {

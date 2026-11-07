@@ -18,7 +18,7 @@ class Retailer extends Model
 
     protected $attributes = ['status' => 'pending'];
 
-    protected $fillable = ['user_id', 'company_name', 'vat_number', 'contact_name', 'contact_email', 'phone', 'address', 'city', 'province', 'region', 'website', 'iban', 'status', 'reviewed_by', 'rejection_reason', 'approved_at', 'rejected_at'];
+    protected $fillable = ['postal_code', 'country_code', 'user_id', 'company_name', 'vat_number', 'contact_name', 'contact_email', 'phone', 'address', 'city', 'province', 'region', 'website', 'iban', 'status', 'reviewed_by', 'rejection_reason', 'approved_at', 'rejected_at'];
 
     protected $hidden = ['iban'];
 

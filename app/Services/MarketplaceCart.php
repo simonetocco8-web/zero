@@ -6,7 +6,9 @@ use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\InventoryItem;
 use App\Models\Retailer;
+use App\Models\ShippingQuote;
 use App\Models\User;
+use App\Services\Shipping\ShippingQuoteService;
 use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -47,12 +49,15 @@ class MarketplaceCart
         }
     }
 
-    public function save(User $user, InventoryItem $product, mixed $quantity, string $mode, bool $add = true): CartItem
+    public function save(User $user, InventoryItem $product, mixed $quantity, string $mode, bool $add = true, ?string $shippingQuoteId = null): CartItem
     {
         Gate::forUser($user)->authorize('purchase', User::class);
+        if ($shippingQuoteId && ! config('shipping.enabled')) {
+            $this->fail('shipping', 'Quotazione dinamica sospesa: nessuna tariffa manuale sostitutiva.');
+        }
         $q = $this->quantity($quantity);
 
-        return DB::transaction(function () use ($user, $product, $q, $mode, $add) {
+        return DB::transaction(function () use ($user, $product, $q, $mode, $add, $shippingQuoteId) {
             User::lockForUpdate()->findOrFail($user->id);
             Retailer::lockForUpdate()->findOrFail($product->retailer_id);
             $product = InventoryItem::lockForUpdate()->findOrFail($product->id);
@@ -64,7 +69,17 @@ class MarketplaceCart
             $quantity = $q + ($add ? ($existing?->quantity_milliunits ?? 0) : 0);
             $this->validate($user, $product, $quantity, $mode);
             $existing ??= $cart->items()->make(['inventory_item_id' => $product->id]);
-            $existing->fill(['quantity_milliunits' => $quantity, 'delivery_mode' => $mode])->save();
+            $existing->fill(['quantity_milliunits' => $quantity, 'delivery_mode' => $mode, 'shipping_quote_id' => null, 'shipping_pricing_mode' => config('shipping.enabled') || $existing->shipping_pricing_mode === 'dynamic' ? 'dynamic' : 'legacy'])->save();
+            // Any quantity/mode mutation invalidates the entire seller shipment.
+            $group = $cart->items()->whereHas('product', fn ($p) => $p->where('retailer_id', $product->retailer_id))->lockForUpdate()->get();
+            $cart->items()->whereIn('id', $group->pluck('id'))->update(['shipping_quote_id' => null]);
+            if ($shippingQuoteId && $mode === 'shipping' && config('shipping.enabled')) {
+                $service = app(ShippingQuoteService::class);
+                $owned = ShippingQuote::where('user_id', $user->id)->findOrFail($shippingQuoteId);
+                $lines = $group->map(fn ($row) => ['product' => $row->product, 'quantity_milliunits' => $row->quantity_milliunits])->all();
+                $quote = $service->valid($user, $shippingQuoteId, $product->retailer, $lines, $owned->request_snapshot['destination'], 'sale', true);
+                $cart->items()->whereIn('id', $group->pluck('id'))->update(['shipping_quote_id' => $quote->id, 'shipping_pricing_mode' => 'dynamic', 'delivery_mode' => 'shipping']);
+            }
 
             return $existing;
         }, 5);
@@ -75,6 +90,7 @@ class MarketplaceCart
         Gate::forUser($user)->authorize('delete', $item);
         DB::transaction(function () use ($user, $item) {
             User::lockForUpdate()->findOrFail($user->id);
+            $item->cart->items()->whereHas('product', fn ($p) => $p->where('retailer_id', $item->product->retailer_id))->update(['shipping_quote_id' => null]);
             $item->delete();
         });
     }

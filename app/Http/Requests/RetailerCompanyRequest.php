@@ -23,6 +23,8 @@ class RetailerCompanyRequest extends FormRequest
         return [
             'company_name' => ['required', 'string', 'max:255'],
             'vat_number' => ['required', 'regex:/^[0-9]{11}$/', Rule::unique('retailers', 'vat_number')->ignore($id)],
+            'postal_code' => ['nullable', 'string', 'max:32', 'regex:/^[A-Za-z0-9 -]{2,32}$/D'],
+            'country_code' => ['nullable', 'regex:/^[A-Z]{2}$/D'],
             'city' => ['required', 'string', 'max:255'],
             'contact_name' => ['nullable', 'string', 'max:255'],
             'contact_email' => ['nullable', 'email', 'max:255'],
