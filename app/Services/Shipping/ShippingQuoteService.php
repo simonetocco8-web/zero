@@ -2,10 +2,12 @@
 
 namespace App\Services\Shipping;
 
+use App\Contracts\ShippingQuoteContextProviderInterface;
 use App\Contracts\ShippingQuoteProviderInterface;
 use App\Models\Retailer;
 use App\Models\ShippingQuote;
 use App\Models\User;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -62,7 +64,7 @@ class ShippingQuoteService
             $products[] = ['id' => $p->id, 'quantity_milliunits' => $line['quantity_milliunits'], 'unit' => $p->unit, 'packing_rule' => $p->packing_rule, 'units_per_parcel_milliunits' => $p->units_per_parcel_milliunits];
         }
 
-        return ['context' => $context, 'retailer_id' => $retailer->id, 'origin' => $this->origin($retailer), 'destination' => $this->address($destination), 'lines' => $products, 'parcels' => $this->parcels->build($lines)];
+        return ($this->provider instanceof ShippingQuoteContextProviderInterface ? ['provider_context' => $this->provider->context($retailer->id)] : []) + ['context' => $context, 'retailer_id' => $retailer->id, 'origin' => $this->origin($retailer), 'destination' => $this->address($destination), 'lines' => $products, 'parcels' => $this->parcels->build($lines)];
     }
 
     public function quote(User $user, Retailer $origin, array $lines, array $destination, string $context = 'sale'): array
@@ -76,41 +78,53 @@ class ShippingQuoteService
         // User-scoped cache avoids cross-user reuse; lock also deduplicates concurrent requests.
         $key = 'shipping:'.$this->provider->name().':'.$user->id.':'.$fingerprint;
 
-        return Cache::lock($key.':lock', 30)->block(3, function () use ($key, $user, $origin, $snapshot, $fingerprint, $context) {
-            $cached = Cache::get($key);
-            if ($cached !== null) {
-                $rows = ShippingQuote::where('user_id', $user->id)->whereIn('id', $cached)->where('status', 'valid')->where('expires_at', '>', now())->get();
-                if ($rows->count() === count($cached)) {
-                    return $rows->sortBy(fn ($q) => $q->rate['final_cents'])->values()->all();
-                }
-            }
-            $rates = $this->provider->quote($snapshot);
-            if (count($rates) > 100) {
-                $this->fail('Risposta del provider non valida.');
-            }
-            $cleanRates = [];
-            foreach ($rates as $rate) {
-                if (! is_array($rate)) {
-                    $this->fail('Risposta del provider non valida.');
-                }
-                foreach (['original_cents', 'final_cents'] as $field) {
-                    if (! isset($rate[$field]) || ! is_int($rate[$field]) || $rate[$field] < 0 || $rate[$field] > 100000000) {
-                        $this->fail('Importo del provider non valido.');
+        try {
+            return Cache::lock($key.':lock', 30)->block(3, function () use ($key, $user, $origin, $snapshot, $fingerprint, $context) {
+                $cached = Cache::get($key);
+                if ($cached !== null) {
+                    $rows = ShippingQuote::where('user_id', $user->id)->whereIn('id', $cached)->where('status', 'valid')->where('expires_at', '>', now())->get();
+                    if ($rows->count() === count($cached)) {
+                        return $this->sortQuotes($rows->all());
                     }
                 }
-                Validator::make($rate, ['carrier' => ['required', 'string', 'max:255'], 'service' => ['required', 'string', 'max:255'], 'currency' => ['required', 'in:EUR'], 'tax_treatment' => ['nullable', 'in:included,excluded,not_applicable'], 'tax_rate_basis_points' => ['nullable', 'integer', 'between:0,10000'], 'conditions' => ['nullable', 'string', 'max:2000'], 'eta' => ['nullable', 'string', 'max:255']])->validate();
-                $rate = array_intersect_key($rate, array_flip(['carrier', 'service', 'original_cents', 'final_cents', 'currency', 'tax_treatment', 'tax_rate_basis_points', 'conditions', 'eta']));
-                $cleanRates[] = $rate;
-            }
-            $quotes = [];
-            foreach ($cleanRates as $rate) {
-                $quotes[] = ShippingQuote::create(['id' => (string) Str::uuid(), 'user_id' => $user->id, 'retailer_id' => $origin->id, 'provider' => $this->provider->name(), 'context' => $context, 'fingerprint' => $fingerprint, 'request_snapshot' => $snapshot, 'rate' => $rate, 'expires_at' => now()->addSeconds(config('shipping.ttl_seconds'))]);
-            }
-            usort($quotes, fn ($a, $b) => $a->rate['final_cents'] <=> $b->rate['final_cents']);
-            Cache::put($key, array_map(fn ($q) => $q->id, $quotes), min(config('shipping.cache_seconds'), config('shipping.ttl_seconds')));
+                $rates = $this->provider->quote($snapshot);
+                if (count($rates) > 1000) {
+                    $this->fail('Risposta del provider non valida.');
+                }
+                $cleanRates = [];
+                foreach ($rates as $rate) {
+                    if (! is_array($rate)) {
+                        $this->fail('Risposta del provider non valida.');
+                    }
+                    foreach (['original_cents', 'final_cents'] as $field) {
+                        if (! isset($rate[$field]) || ! is_int($rate[$field]) || $rate[$field] < 0 || $rate[$field] > 100000000) {
+                            $this->fail('Importo del provider non valido.');
+                        }
+                    }
+                    Validator::make($rate, ['carrier' => ['required', 'string', 'max:255'], 'service' => ['required', 'string', 'max:255'], 'currency' => ['required', 'in:EUR'], 'tax_treatment' => ['nullable', 'in:included,excluded,not_applicable'], 'tax_rate_basis_points' => ['nullable', 'integer', 'between:0,10000'], 'conditions' => ['nullable', 'string', 'max:2000'], 'eta' => ['nullable', 'string', 'max:255'], 'shipping_option_code' => ['nullable', 'string', 'max:255'], 'carrier_code' => ['nullable', 'string', 'max:255'], 'contract_id' => ['nullable', 'integer'], 'quote_source' => ['nullable', 'string', 'max:40'], 'price_breakdown' => ['sometimes', 'array', 'max:100'], 'estimated_surcharges' => ['sometimes', 'array', 'max:100'], 'lead_time_hours' => ['nullable', 'integer', 'between:0,87600']])->validate();
+                    $rate = array_intersect_key($rate, array_flip(['carrier', 'service', 'original_cents', 'final_cents', 'currency', 'tax_treatment', 'tax_rate_basis_points', 'conditions', 'eta', 'shipping_option_code', 'carrier_code', 'contract_id', 'quote_source', 'price_breakdown', 'estimated_surcharges', 'lead_time_hours']));
+                    $cleanRates[] = $rate;
+                }
+                $quotes = [];
+                foreach ($cleanRates as $rate) {
+                    $quotes[] = ShippingQuote::create(['id' => (string) Str::uuid(), 'user_id' => $user->id, 'retailer_id' => $origin->id, 'provider' => $this->provider->name(), 'context' => $context, 'fingerprint' => $fingerprint, 'request_snapshot' => $snapshot, 'rate' => $rate, 'expires_at' => now()->addSeconds(config('shipping.ttl_seconds'))]);
+                }
+                $quotes = $this->sortQuotes($quotes);
+                Cache::put($key, array_map(fn ($q) => $q->id, $quotes), min(config('shipping.cache_seconds'), config('shipping.ttl_seconds')));
 
-            return $quotes;
-        });
+                return $quotes;
+            });
+        } catch (LockTimeoutException) {
+            $this->fail('Una quotazione per questi dati è già in corso. Attendi e riprova.');
+        }
+    }
+
+    private function sortQuotes(array $quotes): array
+    {
+        $key = fn ($q) => [$q->rate['final_cents'], $q->rate['shipping_option_code'] ?? '', $q->rate['carrier'], $q->rate['service'], json_encode($q->rate, JSON_THROW_ON_ERROR), $q->id];
+        usort($quotes, fn ($a, $b) => $key($a) <=> $key($b));
+
+        return $quotes;
     }
 
     public function valid(User $user, string $id, Retailer $origin, array $lines, array $destination, string $context = 'sale', bool $locking = false): ShippingQuote

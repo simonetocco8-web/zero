@@ -1,0 +1,289 @@
+{
+  "data": [
+    {
+      "code": "postnl:standard/signature",
+      "name": "PostNL Standard + Handtekening",
+      "carrier": {
+        "code": "postnl",
+        "name": "PostNL"
+      },
+      "product": {
+        "code": "postnl:standard",
+        "name": "PostNL Standard"
+      },
+      "functionalities": {
+        "b2b": true,
+        "b2c": true,
+        "ers": false,
+        "size": null,
+        "tyres": false,
+        "sorted": false,
+        "boxable": false,
+        "premium": false,
+        "returns": false,
+        "segment": null,
+        "tracked": true,
+        "id_check": false,
+        "incoterm": null,
+        "manually": false,
+        "priority": null,
+        "age_check": null,
+        "insurance": null,
+        "labelless": false,
+        "last_mile": "home_delivery",
+        "signature": true,
+        "surcharge": false,
+        "first_mile": "pickup_dropoff",
+        "multicollo": true,
+        "bulky_goods": false,
+        "form_factor": "parcel",
+        "fresh_goods": false,
+        "eco_delivery": false,
+        "service_area": "domestic",
+        "flex_delivery": false,
+        "fragile_goods": false,
+        "non_conveyable": false,
+        "dangerous_goods": false,
+        "delivery_before": null,
+        "cash_on_delivery": null,
+        "harmonized_label": false,
+        "weekend_delivery": null,
+        "carrier_insurance": false,
+        "delivery_attempts": null,
+        "delivery_deadline": "best_effort",
+        "neighbor_delivery": true,
+        "customs_value_limit": null,
+        "registered_delivery": false,
+        "carrier_billing_type": null,
+        "personalized_delivery": false,
+        "pick_up": false,
+        "direct_contract_only": false
+      },
+      "contract": {
+        "id": 60,
+        "client_id": "",
+        "carrier_code": "postnl",
+        "name": "PostNL Test"
+      },
+      "weight": {
+        "min": {
+          "value": "0.001",
+          "unit": "kg"
+        },
+        "max": {
+          "value": "23.001",
+          "unit": "kg"
+        }
+      },
+      "max_dimensions": {
+        "length": "175.00",
+        "width": "78.00",
+        "height": "58.00",
+        "unit": "cm"
+      },
+      "parcel_billed_weights": [
+        {
+          "unit": "kg",
+          "value": "4.000",
+          "volumetric": false,
+          "calculation": null,
+          "parcel_number": 1
+        }
+      ],
+      "requirements": {
+        "fields": [],
+        "export_documents": false,
+        "is_service_point_required": false
+      },
+      "charging_type": "label_creation",
+      "quote_source": "sendcloud_prices",
+      "quote_error": null,
+      "quotes": [
+        {
+          "weight": {
+            "min": {
+              "value": "0.001",
+              "unit": "kg"
+            },
+            "max": {
+              "value": "23.001",
+              "unit": "kg"
+            }
+          },
+          "price": {
+            "breakdown": [
+              {
+                "type": "price_without_insurance",
+                "label": "Label",
+                "price": {
+                  "value": "15.50",
+                  "currency": "EUR"
+                }
+              },
+              {
+                "type": "insurance_price",
+                "label": "Shipment protection (incl. taxes)",
+                "price": {
+                  "value": "2.00",
+                  "currency": "EUR"
+                }
+              }
+            ],
+            "total": {
+              "value": "17.50",
+              "currency": "EUR"
+            },
+            "converted_price": {
+              "value": "15.07",
+              "currency": "GBP",
+              "rate": "0.86100000",
+              "rate_date": "2026-10-28"
+            }
+          },
+          "lead_time": 24,
+          "estimated_surcharges": [
+            {
+              "type": "remote",
+              "label": "Remote area estimate",
+              "price": {
+                "value": "3.25",
+                "currency": "EUR"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "dpd:test-express",
+      "name": "DPD Test Express",
+      "carrier": {
+        "code": "dpd",
+        "name": "DPD"
+      },
+      "product": {
+        "code": "dpd:test",
+        "name": "DPD Test"
+      },
+      "functionalities": {
+        "b2b": true,
+        "b2c": true,
+        "ers": false,
+        "size": null,
+        "tyres": false,
+        "sorted": false,
+        "boxable": false,
+        "premium": false,
+        "returns": false,
+        "segment": null,
+        "tracked": true,
+        "id_check": false,
+        "incoterm": null,
+        "manually": false,
+        "priority": null,
+        "age_check": null,
+        "insurance": null,
+        "labelless": false,
+        "last_mile": "home_delivery",
+        "signature": true,
+        "surcharge": false,
+        "first_mile": "pickup_dropoff",
+        "multicollo": true,
+        "bulky_goods": false,
+        "form_factor": "parcel",
+        "fresh_goods": false,
+        "eco_delivery": false,
+        "service_area": "domestic",
+        "flex_delivery": false,
+        "fragile_goods": false,
+        "non_conveyable": false,
+        "dangerous_goods": false,
+        "delivery_before": null,
+        "cash_on_delivery": null,
+        "harmonized_label": false,
+        "weekend_delivery": null,
+        "carrier_insurance": false,
+        "delivery_attempts": null,
+        "delivery_deadline": "best_effort",
+        "neighbor_delivery": true,
+        "customs_value_limit": null,
+        "registered_delivery": false,
+        "carrier_billing_type": null,
+        "personalized_delivery": false,
+        "pick_up": false,
+        "direct_contract_only": false
+      },
+      "contract": {
+        "id": 61,
+        "client_id": "",
+        "carrier_code": "dpd",
+        "name": "PostNL Test"
+      },
+      "weight": {
+        "min": {
+          "value": "0.001",
+          "unit": "kg"
+        },
+        "max": {
+          "value": "23.001",
+          "unit": "kg"
+        }
+      },
+      "max_dimensions": {
+        "length": "175.00",
+        "width": "78.00",
+        "height": "58.00",
+        "unit": "cm"
+      },
+      "parcel_billed_weights": [
+        {
+          "unit": "kg",
+          "value": "4.000",
+          "volumetric": false,
+          "calculation": null,
+          "parcel_number": 1
+        }
+      ],
+      "requirements": {
+        "fields": [],
+        "export_documents": false,
+        "is_service_point_required": false
+      },
+      "charging_type": "label_creation",
+      "quote_source": "sendcloud_prices",
+      "quote_error": null,
+      "quotes": [
+        {
+          "weight": {
+            "min": {
+              "value": "0.001",
+              "unit": "kg"
+            },
+            "max": {
+              "value": "23.001",
+              "unit": "kg"
+            }
+          },
+          "price": {
+            "total": {
+              "value": "21.25",
+              "currency": "EUR"
+            },
+            "breakdown": [
+              {
+                "type": "price_without_insurance",
+                "label": "Test shipping",
+                "price": {
+                  "value": "21.25",
+                  "currency": "EUR"
+                }
+              }
+            ]
+          },
+          "lead_time": 12,
+          "estimated_surcharges": []
+        }
+      ]
+    }
+  ]
+}

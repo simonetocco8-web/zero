@@ -14,7 +14,7 @@ use App\Services\Billing\StripeSdkGateway;
 use App\Services\Payments\FakeMarketplacePaymentGateway;
 use App\Services\Payments\StripeConnectMarketplaceGateway;
 use App\Services\Shipping\FakeShippingProvider;
-use App\Services\Shipping\PaccofacileShippingProvider;
+use App\Services\Shipping\SendcloudShippingProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
@@ -42,11 +42,11 @@ class AppServiceProvider extends ServiceProvider
                 return new FakeShippingProvider;
             }
 
-            if (config('shipping.provider') !== 'paccofacile') {
+            if (config('shipping.provider') !== 'sendcloud') {
                 throw ValidationException::withMessages(['shipping' => 'Provider di spedizione non configurato.']);
             }
 
-            return new PaccofacileShippingProvider;
+            return $this->app->make(SendcloudShippingProvider::class);
         });
         $this->app->bind(MarketplacePaymentGatewayInterface::class, fn () => $this->app->make(config('marketplace.economic_rules.execution_mode') === 'stripe_connect' ? StripeConnectMarketplaceGateway::class : FakeMarketplacePaymentGateway::class));
         $this->app->bind(ExchangePaymentGatewayInterface::class, fn () => $this->app->make(config('marketplace.economic_rules.execution_mode') === 'stripe_connect' ? StripeConnectMarketplaceGateway::class : FakeMarketplacePaymentGateway::class));

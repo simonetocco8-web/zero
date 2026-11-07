@@ -1,4 +1,8 @@
-# Quotazioni spedizioni — stato della release
+# Quotazioni spedizioni — architettura e storico
+
+## Decisione corrente: Sendcloud v3
+
+Dal 7 novembre 2026 il provider previsto è **Sendcloud API v3**, con quotazione informativa HTTP implementata e pagamento disabilitato. Paccofacile è inattivo e non selezionabile. Contratto verificato, configurazione corrente, limiti e checklist in [sendcloud-v3.md](sendcloud-v3.md); risultati aggiornati in [sendcloud-v3-validation.md](sendcloud-v3-validation.md). Le sezioni sotto documentano l’architettura iniziale e lo storico, non l’attivazione corrente di Paccofacile.
 
 ## Stato e confini
 
@@ -25,7 +29,7 @@ Branch `feat/paccofacile-shipping-quotes`, base `main` `2170a40b89caeca8fb952803
 | IVA, commissioni, Connect, credito, bonus, reservation, refund | IVA esplicita attuale in `MarketplaceTaxSnapshot`; commissione sulla sola merce netta. Bonus esclude trasporto. Nessun cambiamento a ledger, Connect o rimborsi. Ordini/reservation già creati continuano sugli snapshot storici. |
 | Deployment ZIP | Una migration nuova additiva, inclusa nella registry dopo revisione; migration storiche inalterate. Nessun `.env` reale, APP_KEY, seed o DB di produzione modificato. |
 
-## Contratto Paccofacile: evidenza del 7 novembre 2026
+## STORICO — contratto Paccofacile: evidenza del 7 novembre 2026
 
 Fonti ufficiali effettivamente recuperate via HTTPS:
 
@@ -87,11 +91,10 @@ Contesti `exchange:{request_key}:a/b`, due origini/destinazioni e due insiemi di
 
 ```dotenv
 SHIPPING_QUOTES_ENABLED=false
-SHIPPING_PROVIDER=paccofacile
-PACCOFACILE_ENVIRONMENT=sandbox
-PACCOFACILE_API_KEY=
-PACCOFACILE_TOKEN=
-PACCOFACILE_ACCOUNT_NUMBER=
+SHIPPING_PROVIDER=sendcloud
+SENDCLOUD_API_PUBLIC_KEY=
+SENDCLOUD_API_PRIVATE_KEY=
+SENDCLOUD_API_TIMEOUT=15
 SHIPPING_QUOTE_TTL_SECONDS=300
 SHIPPING_QUOTE_CACHE_SECONDS=60
 ```

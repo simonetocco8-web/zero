@@ -1,3 +1,5 @@
+> **Storico della prima implementazione Paccofacile/fake.** Per il passaggio corrente a Sendcloud v3 e i nuovi collaudi consultare [sendcloud-v3-validation.md](sendcloud-v3-validation.md). I comandi e i risultati sotto si riferiscono alla revisione precedente.
+
 # Verifica quotazioni spedizioni — 7 novembre 2026
 
 Tutti i database usati sono nuovi/isolati o transazionali di test. Nessuna chiamata di pagamento o spedizione reale, nessun database produzione, nessun comando distruttivo. PHP 8.4.26; SQLite; MySQL 8.4.13 in container dedicato sulla porta locale 3337. Le variabili marketplace del runtime sono sovrascritte soltanto nei processi di test con valori fake/disabilitati; `.env` e APP_KEY reali inalterati.
