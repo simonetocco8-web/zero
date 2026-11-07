@@ -184,7 +184,16 @@ class ShippingQuoteTest extends TestCase
         $this->invalid(fn () => $s->valid($u, $q->id, $p->retailer, $this->lines($p), $this->destination()));
     }
 
-    public function test_grouped_shipping_is_charged_once_snapshot_and_idempotent_order_keep_destination(): void
+    public static function groupedShippingRates(): array
+    {
+        return [
+            'Standard' => [800, 'TEST Courier A', 'TEST Standard'],
+            'Express' => [1050, 'TEST Courier B', 'TEST Express'],
+        ];
+    }
+
+    #[DataProvider('groupedShippingRates')]
+    public function test_grouped_shipping_is_charged_once_snapshot_and_idempotent_order_keep_destination(int $shippingCents, string $carrier, string $service): void
     {
         config(['shipping.checkout_verified' => true]); // Explicit test-only fiscal/funds-flow approval.
         $u = $this->buyer();
@@ -194,18 +203,27 @@ class ShippingQuoteTest extends TestCase
         $cart->save($u, $p, '3', 'shipping');
         $cart->save($u, $other, '1', 'shipping');
         $this->actingAs($u)->postJson(route('shipping.quote'), ['retailer_id' => $p->retailer_id, 'address' => $this->destination()])->assertOk();
-        $selected = ShippingQuote::orderBy('created_at')->first();
+        // Equal timestamps must not decide which service the customer selects.
+        ShippingQuote::query()->update(['created_at' => now()->startOfSecond()]);
+        $selected = ShippingQuote::where('user_id', $u->id)->where('retailer_id', $p->retailer_id)->where('rate->final_cents', $shippingCents)->sole();
+        $this->assertSame($shippingCents, $selected->rate['final_cents']);
+        $this->assertSame($carrier, $selected->rate['carrier']);
+        $this->assertSame($service, $selected->rate['service']);
         $this->actingAs($u)->post(route('shipping.select'), ['shipping_quote_id' => $selected->id])->assertRedirect(route('checkout.index'));
         $address = app(SaveCustomerAddress::class)->handle($u, $this->destination() + ['label' => 'Casa']);
         $quote = app(MarketplaceQuote::class)->build($u, [], $address);
-        $this->assertSame(800, $quote['shipping_cents']);
-        $this->assertSame(4800, $quote['total_cents']);
+        $this->assertSame($shippingCents, $quote['shipping_cents']);
+        $this->assertSame(4000 + $shippingCents, $quote['total_cents']);
         $this->assertSame(20, array_sum(array_column($quote['groups'][0]['items'], 'commission_cents')));
-        $this->assertSame(800, array_sum(array_column($quote['groups'][0]['items'], 'shipping_cost_cents')));
+        $this->assertSame($shippingCents, array_sum(array_column($quote['groups'][0]['items'], 'shipping_cost_cents')));
         $key = (string) Str::uuid();
         $order = app(CreateMarketplaceOrder::class)->handle($u, $key, [], $address->id, app(MarketplaceQuote::class)->hash($quote));
         $this->assertSame('20100', $order->vendorOrders->first()->address_snapshot['postal_code']);
+        $this->assertSame($shippingCents, $order->shipping_cents);
+        $this->assertSame(4000 + $shippingCents, $order->total_cents);
+        $this->assertSame($service, $order->vendorOrders->first()->items->first()->product_snapshot['shipping_quote']['rate']['service']);
         $this->assertSame('used', $selected->fresh()->status);
+        $this->assertSame('valid', ShippingQuote::where('id', '!=', $selected->id)->sole()->status);
         $this->assertSame($order->id, app(CreateMarketplaceOrder::class)->handle($u, $key, [], $address->id, 'ignored')->id);
     }
 
