@@ -209,7 +209,7 @@ class AdminInventoryReviewQueueTest extends TestCase
         $this->assertSame($oldOrder, $order->fresh()->getRawOriginal());
         $this->assertSame(30000, $item->fresh()->quantity_milliunits);
         config(['shipping.enabled' => true]);
-        $response = $this->actingAs($buyer)->get(route('marketplace.show', $item))->assertOk()->assertSee('400 × 250 × 200 mm')->assertSee('2500 g');
+        $response = $this->actingAs($buyer)->get(route('marketplace.show', $item))->assertOk()->assertSee('40 × 25 × 20 cm')->assertSee('2,5 kg');
         $xpath = $this->xpath($response->getContent());
         $this->assertSame(1, $xpath->query('//*[@data-product-actions]//button[@data-shipping-trigger]')->length);
         $this->assertSame(1, $xpath->query('//dialog[@aria-label="Calcola Spedizione"]')->length);

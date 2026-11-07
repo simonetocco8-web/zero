@@ -60,7 +60,7 @@ class ShippingQuoteController extends Controller
 
     public function select(Request $request, ShippingQuoteService $service, MarketplaceCart $carts)
     {
-        $data = $request->validate(['shipping_quote_id' => ['required', 'uuid']]);
+        $data = $request->validate(['shipping_quote_id' => ['required', 'uuid'], 'return_to' => ['sometimes', 'in:cart,checkout']]);
         DB::transaction(function () use ($request, $data, $service, $carts) {
             $user = $request->user();
             User::lockForUpdate()->findOrFail($user->id);
@@ -77,6 +77,6 @@ class ShippingQuoteController extends Controller
             $carts->cart($user)->items()->whereIn('id', $rows->pluck('id'))->update(['shipping_quote_id' => $selected->id, 'shipping_pricing_mode' => 'dynamic', 'delivery_mode' => 'shipping']);
         });
 
-        return to_route('checkout.index')->with('status', 'Tariffa selezionata. Verifica indirizzo e riepilogo.');
+        return to_route(($data['return_to'] ?? 'checkout') === 'cart' ? 'cart.index' : 'checkout.index')->with('status', 'Tariffa selezionata. Verifica indirizzo e riepilogo.');
     }
 }

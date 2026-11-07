@@ -1,36 +1,37 @@
-@props(['item' => null, 'retailerId' => null])
-<div class="flex" x-data="{ busy: false, error: '', rates: [], informational: false, selected: '', alternate: false,
- async calculate() {
-    this.busy = true; this.error = ''; this.rates = []; this.selected = '';
-    const form = new FormData(this.$refs.calculation);
-    if (!this.alternate) { for (const key of [...form.keys()]) { if(key.startsWith('address[')) form.delete(key); } }
-    else { form.delete('address_id'); }
-    try {
-        const response = await fetch(@js(route('shipping.quote')), {method: 'POST', headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': @js(csrf_token())}, body: form});
-        const result = await response.json();
-        if (!response.ok) throw new Error(Object.values(result.errors || {}).flat().join(' ') || 'Quotazione non disponibile. Riprova.');
-        this.rates = result.quotes; this.informational = result.informational;
-        if (!this.rates.length) this.error = 'Nessuna tariffa disponibile per questa spedizione.';
-    } catch (error) { this.error = error.message || 'Connessione non disponibile. Riprova.'; }
-    finally { this.busy = false; }
- }}">
-<x-button type="button" variant="secondary" data-shipping-trigger x-ref="opener" @click="$refs.dialog.showModal()"><x-icon name="truck" /> Calcola Spedizione</x-button>
-<dialog x-ref="dialog" @close="$refs.opener.focus()" class="m-auto max-h-[90dvh] w-[min(95vw,42rem)] overflow-y-auto rounded-xl border border-white/20 bg-slate-900 p-5 text-white backdrop:bg-black/70" aria-label="Calcola Spedizione">
-<div class="flex items-center justify-between gap-3"><h2>Calcola Spedizione</h2><button class="min-h-11 px-3" type="button" @click="$refs.dialog.close()" aria-label="Chiudi calcolatore">Chiudi</button></div>
-@if($item)<p class="my-3 font-semibold">{{ $item->name }}</p><p>Imballaggio: {{ $item->length_mm ?? '—' }} × {{ $item->width_mm ?? '—' }} × {{ $item->height_mm ?? '—' }} mm · {{ $item->weight_g ?? '—' }} g per collo.</p><p>Partenza: {{ $item->retailer->city }} · {{ $item->retailer->province }}.</p>@endif
-<p class="my-3 text-sm">Il preventivo comprende tutti i prodotti di questo rivenditore presenti nel carrello. Le tariffe restano indicative fino alla verifica finale.</p>
-<form x-ref="calculation" @submit.prevent="calculate" class="space-y-4" @change="rates=[];selected=''">
-@if($item)<input type="hidden" name="item_id" value="{{ $item->id }}"><label class="field-label">Quantità da aggiungere<input class="field" name="quantity" value="1" inputmode="decimal" required @input="$refs.addQuantity.value=$event.target.value;rates=[];selected=''"></label>@else<input type="hidden" name="retailer_id" value="{{ $retailerId }}">@endif
-<label class="field-label">Indirizzo salvato<select class="field" name="address_id" :disabled="alternate"><option value="">Seleziona un indirizzo</option>@foreach(auth()->user()->customerAddresses()->orderByDesc('is_default_shipping')->get() as $address)<option value="{{ $address->id }}" @selected($address->is_default_shipping)>{{ $address->recipient_name }} · {{ $address->address_line_1 }} · {{ $address->postal_code }} {{ $address->city }}</option>@endforeach</select></label>
-<label class="flex min-h-11 items-center gap-2"><input type="checkbox" x-model="alternate"> Calcola su altro indirizzo</label>
-<fieldset x-show="alternate" :disabled="!alternate" class="grid gap-3 sm:grid-cols-2"><legend>Destinazione alternativa</legend>
-@foreach(['recipient_name'=>'Destinatario','address_line_1'=>'Indirizzo e numero civico','postal_code'=>'CAP','city'=>'Città','province'=>'Provincia (sigla per Italia)','country_code'=>'Paese ISO (es. IT)','phone'=>'Telefono (facoltativo)'] as $field=>$label)<label class="field-label">{{ $label }}<input class="field" name="address[{{ $field }}]" maxlength="255" value="{{ $field === 'country_code' ? 'IT' : '' }}"></label>@endforeach
-<label class="flex min-h-11 items-center gap-2"><input type="checkbox" name="save_address" value="1"> Salva questo indirizzo nella rubrica</label></fieldset>
-<a class="underline" href="{{ route('customer.addresses.index') }}">Gestisci rubrica indirizzi</a>
-<button type="submit" class="btn btn-primary min-h-11" :disabled="busy" x-text="busy ? 'Calcolo in corso…' : 'Calcola costo'"></button>
-</form>
-<p role="alert" class="my-3 text-red-300" x-text="error"></p>
-<p x-show="informational && rates.length" class="my-3">Quotazione informativa: checkout con spedizione in attesa di verifica fiscale e del modello di incasso.</p>
-<fieldset class="space-y-3"><legend x-show="rates.length">Scegli il servizio</legend><template x-for="(quote,index) in rates" :key="quote.id"><label class="flex min-h-11 cursor-pointer gap-3 rounded-lg border p-3"><input type="radio" x-model="selected" :value="quote.id"><span class="min-w-0 break-words"><strong x-text="quote.rate.carrier + ' · ' + quote.rate.service"></strong><span class="block" x-text="(quote.rate.final_cents/100).toLocaleString('it-IT',{style:'currency',currency:'EUR'})"></span><span class="block" x-show="index===0">Più economica</span><span class="block" x-text="quote.rate.conditions || ''"></span><span class="block" x-text="quote.rate.eta || ''"></span><span class="block text-sm" x-show="quote.rate.shipping_option_code" x-text="'Opzione: ' + (quote.rate.shipping_option_code || '')"></span><span class="block text-sm" x-show="quote.rate.price_breakdown?.length">Componenti comprese nel totale:</span><template x-for="(part,partIndex) in (quote.rate.price_breakdown || [])" :key="partIndex"><span class="block text-sm" x-text="part.label + ': ' + (part.amount_cents/100).toLocaleString('it-IT',{style:'currency',currency:'EUR'})"></span></template><span class="block text-sm" x-show="quote.rate.estimated_surcharges?.length">Supplementi stimati separati (non sommati al totale):</span><template x-for="(part,partIndex) in (quote.rate.estimated_surcharges || [])" :key="partIndex"><span class="block text-sm" x-text="part.label + ': ' + (part.amount_cents/100).toLocaleString('it-IT',{style:'currency',currency:'EUR'})"></span></template><span class="block" x-text="quote.rate.tax_treatment === 'included' ? 'IVA inclusa' : 'Trattamento IVA da verificare'"></span></span></label></template></fieldset>
-<form method="POST" action="{{ $item ? route('cart.store',$item) : route('shipping.select') }}" x-show="selected" class="mt-4">@csrf<input type="hidden" name="shipping_quote_id" :value="selected">@if($item)<input type="hidden" name="delivery_mode" value="shipping"><input type="hidden" name="quantity" value="1" x-ref="addQuantity">@endif<x-button type="submit">{{ $item ? 'Aggiungi al carrello' : 'Conferma tariffa' }}</x-button></form>
-</dialog></div>
+@props(['item' => null, 'retailerId' => null, 'lines' => [], 'label' => 'Calcola Spedizione', 'returnTo' => 'checkout'])
+<div class="flex min-w-0" x-id="['shipping-error']" x-data="shippingCalculator({ endpoint: @js(route('shipping.quote')), csrf: @js(csrf_token()) })">
+    <x-button type="button" variant="secondary" data-shipping-trigger x-ref="opener" @click="$refs.dialog.showModal()"><x-icon name="truck" /> {{ $label }}</x-button>
+    <dialog x-ref="dialog" @close="$refs.opener.focus()" class="shipping-dialog m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto rounded-2xl border border-line bg-surface p-5 text-ink shadow-xl sm:p-7" aria-label="Calcola Spedizione">
+        <header class="flex items-start justify-between gap-4"><div><p class="brand-eyebrow">Consegna a domicilio</p><h2 class="mt-1">Calcola Spedizione</h2></div><x-button type="button" variant="secondary" @click="$refs.dialog.close()" aria-label="Chiudi calcolatore">Chiudi</x-button></header>
+        <div class="my-5 rounded-xl border border-line bg-raised p-4">
+            @php($shipmentLines = $item ? [['product'=>$item,'quantity_milliunits'=>null]] : collect($lines)->map(fn($line)=>['product'=>$line->product,'quantity_milliunits'=>$line->quantity_milliunits]))
+            <ul class="space-y-4">@foreach($shipmentLines as $shipmentLine)@php($product=$shipmentLine['product'])
+                <li><h3 class="font-semibold">{{ $product->name }}</h3><p class="mt-1 text-sm">Collo: {{ ($product->length_mm === null ? '—' : str_replace('.', ',', (string) \Brick\Math\BigDecimal::of($product->length_mm)->dividedBy(10, 1)->strippedOfTrailingZeros())) }} × {{ ($product->width_mm === null ? '—' : str_replace('.', ',', (string) \Brick\Math\BigDecimal::of($product->width_mm)->dividedBy(10, 1)->strippedOfTrailingZeros())) }} × {{ ($product->height_mm === null ? '—' : str_replace('.', ',', (string) \Brick\Math\BigDecimal::of($product->height_mm)->dividedBy(10, 1)->strippedOfTrailingZeros())) }} cm · {{ $product->weight_g === null ? 'Peso non indicato' : \App\Support\DisplayQuantity::format($product->weight_g).' kg' }}</p>
+                @if($shipmentLine['quantity_milliunits'] !== null)<p class="text-sm">Quantità: {{ \App\Support\DisplayQuantity::format($shipmentLine['quantity_milliunits']) }} {{ $product->unit }}</p>@endif</li>
+            @endforeach</ul>
+            @php($origin = $item?->retailer ?? (collect($lines)->first()?->product->retailer))
+            @if($origin)<p class="mt-4 text-sm"><strong>Partenza:</strong> {{ $origin->city }} · {{ $origin->province }} · {{ $origin->country_code }}</p>@endif
+        </div>
+        <p class="mb-5 text-sm text-muted">Il calcolo comprende tutti i prodotti di questo rivenditore nel carrello e la quantità da aggiungere. Le tariffe sono indicative e possono cambiare prima dell’acquisto.</p>
+        <form x-ref="calculation" @submit.prevent="calculate" @input="invalidate" @change="invalidate" class="space-y-5">
+            @if($item)<input type="hidden" name="item_id" value="{{ $item->id }}"><label class="field-label">Quantità da aggiungere (obbligatoria)<input class="field mt-2" name="quantity" value="1" inputmode="decimal" required @input="$refs.addQuantity.value=$event.target.value"></label>@else<input type="hidden" name="retailer_id" value="{{ $retailerId }}">@endif
+            <label class="field-label">Indirizzo di destinazione<select class="field mt-2" name="address_id" :disabled="alternate"><option value="">Seleziona un indirizzo</option>@foreach(auth()->user()->customerAddresses()->orderByDesc('is_default_shipping')->orderBy('id')->get() as $address)<option value="{{ $address->id }}" @selected($address->is_default_shipping)>{{ $address->recipient_name }} · {{ $address->address_line_1 }} · {{ $address->postal_code }} {{ $address->city }}</option>@endforeach</select></label>
+            <label class="flex min-h-11 items-center gap-3"><input type="checkbox" x-model="alternate"> Calcola su altro indirizzo</label>
+            <fieldset x-show="alternate" x-cloak :disabled="!alternate" class="grid min-w-0 gap-4 sm:grid-cols-2"><legend class="mb-3 font-semibold">Destinazione alternativa</legend>
+                @foreach(['recipient_name'=>'Destinatario','address_line_1'=>'Indirizzo e numero civico','postal_code'=>'CAP','city'=>'Città','province'=>'Provincia (sigla per Italia)','country_code'=>'Paese (es. IT)','phone'=>'Telefono'] as $field=>$fieldLabel)<label class="field-label">{{ $fieldLabel }} {{ $field === 'phone' ? '(facoltativo)' : '(obbligatorio)' }}<input class="field mt-2" name="address[{{ $field }}]" maxlength="{{ $field === 'phone' ? 40 : 255 }}" value="{{ $field === 'country_code' ? 'IT' : '' }}" placeholder="{{ match($field) {'postal_code'=>'Es. 20100','province'=>'Es. MI',default=>''} }}" @if($field !== 'phone') :required="alternate" @endif :aria-describedby="$id('shipping-error') + '-{{ $field }}'" :aria-invalid="fieldErrors['{{ $field }}'] ? 'true' : 'false'"><span :id="$id('shipping-error') + '-{{ $field }}'" class="mt-2 block text-danger" x-show="fieldErrors['{{ $field }}']" x-text="fieldErrors['{{ $field }}']"></span></label>@endforeach
+                <label class="flex min-h-11 items-center gap-3 sm:col-span-2"><input type="checkbox" name="save_address" value="1"> Salva questo indirizzo nella rubrica</label>
+            </fieldset>
+            <div class="flex flex-wrap items-center justify-between gap-4"><a class="font-medium text-brand-700 underline underline-offset-4" href="{{ route('customer.addresses.index') }}">Gestisci rubrica indirizzi</a><x-button type="submit" x-bind:disabled="busy" x-text="busy ? 'Calcolo in corso…' : 'Calcola costo'">Calcola costo</x-button></div>
+        </form>
+        <p role="alert" class="mt-4 text-danger" x-text="error"></p>
+        <p x-show="busy" role="status" class="mt-3 text-muted">Stiamo cercando le tariffe disponibili…</p>
+        <fieldset x-show="rates.length" class="mt-5 space-y-3"><legend class="mb-3 font-semibold">Scegli la spedizione</legend><template x-for="quote in rates" :key="quote.id">
+            <label class="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border border-control bg-raised p-4" :class="selected === quote.id ? 'ring-2 ring-brand-700' : ''">
+                <input class="mt-1" type="radio" x-model="selected" :value="quote.id" name="shipping-service"><span class="min-w-0 flex-1"><span class="flex flex-wrap items-start justify-between gap-3"><span><strong class="block" x-text="quote.rate.carrier"></strong><span class="mt-1 block text-sm" x-text="quote.rate.service"></span></span><strong class="text-xl" x-text="money(quote.rate.final_cents)"></strong></span><span class="mt-3 inline-block rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700" x-show="quote.rate.final_cents === cheapest()">Più economica</span><span class="mt-2 block text-sm text-muted" x-text="deliveryTime(quote.rate)"></span></span>
+            </label></template>
+        </fieldset>
+        <p x-show="rates.length" class="mt-4 text-sm text-muted">Costo indicativo, da riconfermare prima dell’acquisto. Eventuali imposte non ancora definite possono modificare l’importo. I tempi di consegna sono stime, non date garantite.</p>
+        <p x-show="informational && rates.length" class="mt-3 text-sm">Puoi salvare la tariffa nel carrello. L’acquisto con questa spedizione non è ancora disponibile.</p>
+        <form x-cloak method="POST" action="{{ $item ? route('cart.store',$item) : route('shipping.select') }}" x-show="selected" class="mt-5">@csrf<input type="hidden" name="shipping_quote_id" :value="selected">@if($item)<input type="hidden" name="delivery_mode" value="shipping"><input type="hidden" name="quantity" value="1" x-ref="addQuantity">@else<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif<x-button type="submit" x-bind:disabled="busy || !selected">{{ $item ? 'Aggiungi al carrello' : 'Salva tariffa indicativa' }}</x-button></form>
+    </dialog>
+</div>

@@ -11,6 +11,7 @@ use App\Services\CustomerPromotionalBonus;
 use App\Services\MarketplaceCart;
 use App\Services\MarketplaceQuote;
 use App\Services\Payments\StartMarketplacePayment;
+use App\Services\PurchaseSummary;
 use App\Services\RetailerCredit;
 use Brick\Math\BigInteger;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ class CheckoutController extends Controller
             $carts->validate($request->user(), $line->product, $line->quantity_milliunits, $line->delivery_mode);
         }
 
-        return view('cart.checkout', ['cart' => $cart, 'addresses' => $request->user()->customerAddresses()->get()]);
+        return view('cart.checkout', ['cart' => $cart, 'summary' => app(PurchaseSummary::class)->cart($request->user(), $cart), 'addresses' => $request->user()->customerAddresses()->get()]);
     }
 
     public function review(CheckoutRequest $request, MarketplaceQuote $quotes)
@@ -42,6 +43,12 @@ class CheckoutController extends Controller
             if ($selected) {
                 $address = (new CustomerAddress)->forceFill($selected->request_snapshot['destination'] + ['user_id' => $request->user()->id]);
             }
+        }
+        $summary = app(PurchaseSummary::class)->cart($request->user(), app(MarketplaceCart::class)->cart($request->user())->load('items.product.retailer'), $data['modes'], $address?->toArray());
+        if ($summary['checkout_blocked']) {
+            $request->session()->forget('marketplace_checkout');
+
+            return view('cart.shipping-review', ['summary' => $summary]);
         }
         $quote = $quotes->build($request->user(), $data['modes'], $address);
         $key = (string) Str::uuid();

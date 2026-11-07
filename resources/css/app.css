@@ -213,3 +213,7 @@
 @media (min-width: 640px) and (max-width: 1279px) {
     .admin-stock-table tbody tr { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Keep the primary action legible while hovered in both themes. */
+.btn-primary:hover:not(:disabled) { background-color: #096b60; color: #ffffff; }
+.btn-primary { transition-property: box-shadow; }

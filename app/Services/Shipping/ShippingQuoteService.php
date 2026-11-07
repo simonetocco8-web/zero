@@ -38,7 +38,7 @@ class ShippingQuoteService
             'province' => ['required', 'string', 'max:80'],
             'country_code' => ['required', 'regex:/^[A-Z]{2}$/D'],
             'company' => ['nullable', 'string', 'max:255'], 'address_line_2' => ['nullable', 'string', 'max:255'], 'phone' => ['nullable', 'string', 'max:40'],
-        ])->validate();
+        ], [], ['recipient_name' => 'destinatario', 'address_line_1' => 'indirizzo e numero civico', 'postal_code' => 'CAP', 'city' => 'città', 'province' => 'provincia', 'country_code' => 'paese', 'phone' => 'telefono'])->validate();
         if ($data['country_code'] === 'IT' && (! preg_match('/^[0-9]{5}$/D', $data['postal_code']) || ! preg_match('/^[A-Z]{2}$/D', $data['province']))) {
             $this->fail('Per l’Italia indica CAP di cinque cifre e sigla provincia di due lettere.');
         }
@@ -149,7 +149,7 @@ class ShippingQuoteService
     public function checkoutAllowed(): void
     {
         if (! config('shipping.checkout_verified') || ($this->provider->name() === 'fake' && ! app()->environment('testing'))) {
-            $this->fail('Preventivo solo informativo. Checkout con spedizione sospeso fino alla verifica fiscale e del modello di incasso del trasporto.');
+            $this->fail('La tariffa è indicativa. L’acquisto con spedizione non è ancora disponibile. Puoi scegliere il ritiro, se previsto.');
         }
     }
 

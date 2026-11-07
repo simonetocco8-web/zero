@@ -6,13 +6,16 @@ use App\Http\Requests\CartItemRequest;
 use App\Models\CartItem;
 use App\Models\InventoryItem;
 use App\Services\MarketplaceCart;
+use App\Services\PurchaseSummary;
 use Illuminate\Http\Request;
 
 class CartController extends Controller
 {
     public function index(Request $request, MarketplaceCart $carts)
     {
-        return view('cart.index', ['cart' => $carts->cart($request->user())->load(['items.product' => fn ($q) => $q->withSum(['stockReservations as reserved_milliunits' => fn ($r) => $r->where('status', 'active')->where('expires_at', '>', now())], 'quantity_milliunits')->with('retailer')]), 'carts' => $carts]);
+        $cart = $carts->cart($request->user())->load(['items.product' => fn ($q) => $q->withSum(['stockReservations as reserved_milliunits' => fn ($r) => $r->where('status', 'active')->where('expires_at', '>', now())], 'quantity_milliunits')->with('retailer')]);
+
+        return view('cart.index', ['cart' => $cart, 'summary' => app(PurchaseSummary::class)->cart($request->user(), $cart)]);
     }
 
     public function store(CartItemRequest $request, InventoryItem $item, MarketplaceCart $carts)
