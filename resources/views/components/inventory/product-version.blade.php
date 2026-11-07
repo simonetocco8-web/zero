@@ -2,6 +2,7 @@
 <x-card class="space-y-4">
     <h3 class="text-lg font-semibold">{{ $label }}</h3>
     <dl class="space-y-3 break-words">
+        <div><dt>Imballaggio pronto alla spedizione</dt><dd>{{ $item->length_mm ?? "—" }} × {{ $item->width_mm ?? "—" }} × {{ $item->height_mm ?? "—" }} mm · {{ $item->weight_g ?? "—" }} g · {{ $item->packing_rule ?? "Da completare" }}</dd></div>
         <div><dt class="text-sm text-muted">Nome</dt><dd class="font-semibold">{{ $item->name }}</dd></div>
         <div><dt class="text-sm text-muted">Prezzo ZeroMagazzino</dt><dd>{{ \App\Support\DisplayMoney::euros($item->zero_price_cents) }}</dd></div>
         <div><dt class="text-sm text-muted">Quantità</dt><dd>{{ \App\Support\DisplayQuantity::format($item->quantity_milliunits) }} {{ $item->unit }}</dd></div>

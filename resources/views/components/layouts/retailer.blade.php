@@ -1,2 +1,2 @@
 @props(['title'])
-<x-area-shell area="retailer" :title="$title">{{ $slot }}</x-area-shell>
+<x-area-shell area="retailer" :title="$title">@if(config('shipping.enabled') && auth()->user()?->retailer && (!auth()->user()->retailer->postal_code || !auth()->user()->retailer->country_code || !auth()->user()->retailer->address || !auth()->user()->retailer->province))<x-alert class="mb-4">Dati di partenza incompleti: <a href="{{ route('retailer.profile') }}" class="underline">completa CAP, indirizzo, provincia e Paese nel profilo</a> per consentire i preventivi.</x-alert>@endif{{ $slot }}</x-area-shell>

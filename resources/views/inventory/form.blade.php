@@ -15,6 +15,14 @@ $price=fn($key)=>isset($data[$key]) ? (string)\Brick\Math\BigDecimal::of($data[$
 <x-select name="condition" label="Condizione" required>@foreach(['new'=>'Nuovo','end_of_line'=>'Fine serie','old_stock'=>'Fondo magazzino','damaged_packaging'=>'Imballo danneggiato'] as $value=>$label)<option value="{{ $value }}" @selected(old('condition',$data['condition']??'new')===$value)>{{ $label }}</option>@endforeach</x-select></div>
 <x-textarea name="description" label="Descrizione" rows="5" maxlength="10000" required>{{ old('description',$data['description']??'') }}</x-textarea>
 </fieldset>
+<fieldset class="space-y-4"><legend>Imballaggio pronto per la spedizione</legend><p>Misura il collo chiuso, includendo protezioni e peso lordo. Per pezzi, la capacità dichiara un collo di queste dimensioni e peso anche se parzialmente pieno. Per kg, metri o quantità frazionarie si spediscono soltanto multipli esatti delle unità per collo dichiarate.</p><div class="grid gap-4 sm:grid-cols-2">
+@foreach(['length'=>'Lunghezza (cm)','width'=>'Larghezza (cm)','height'=>'Altezza (cm)','weight'=>'Peso lordo (kg)','units_per_parcel'=>'Unità di vendita per collo'] as $key=>$label)
+@php($storedKey=match($key){'weight'=>'weight_g','units_per_parcel'=>'units_per_parcel_milliunits',default=>$key.'_mm'})
+<x-field :name="$key" :label="$label" :required="config('shipping.enabled')" inputmode="decimal" :value="isset($data[$storedKey]) ? (string)\Brick\Math\BigDecimal::of($data[$storedKey])->dividedBy($key==='weight'||$key==='units_per_parcel'?1000:10,3) : ''" />
+@endforeach
+<input type="hidden" name="dimension_unit" value="cm"><input type="hidden" name="weight_unit" value="kg">
+<x-select name="packing_rule" label="Regola imballaggio" :required="config('shipping.enabled')"><option value="">Seleziona</option>@foreach(['whole_parcels'=>'Solo multipli esatti di un collo','pieces_capacity'=>'Pezzi: capacità massima per collo'] as $value=>$label)<option value="{{ $value }}" @selected(old('packing_rule',$data['packing_rule']??'')===$value)>{{ $label }}</option>@endforeach</x-select>
+<x-field name="packaging_type" label="Tipologia imballaggio (facoltativa)" :value="$data['packaging_type']??''" maxlength="40" /></div></fieldset>
 <fieldset><legend class="mb-4 text-lg font-semibold">Foto</legend>
 @if($editing)<div class="grid grid-cols-3 gap-2">@foreach($item->proposed_images??$item->images->map->only(['disk','path'])->all() as $position=>$photo)<img class="aspect-square w-full rounded-xl object-cover" src="{{ route('inventory.image',[$item,$position,'proposed'=>$item->proposed_data ? 1:0]) }}" alt="Foto attuale" loading="lazy" decoding="async">@endforeach</div>@endif
 <div x-data="{ gallery: [], camera: [], get previews() { return [...this.gallery,...this.camera]; }, preview(files, source) { this[source].forEach(url => URL.revokeObjectURL(url)); this[source] = Array.from(files).map(file => URL.createObjectURL(file)); } }">
@@ -33,7 +41,7 @@ $price=fn($key)=>isset($data[$key]) ? (string)\Brick\Math\BigDecimal::of($data[$
 <x-field name="zero_price" label="Prezzo ZeroMagazzino (€)" :value="$price('zero_price_cents')" inputmode="decimal" required />
 </div></fieldset>
 <fieldset><legend class="mb-4 text-lg font-semibold">Opzioni</legend><fieldset><legend class="field-label">Consegna</legend>@foreach(['pickup_available'=>'Ritiro in sede','shipping_available'=>'Spedizione'] as $key=>$label)<x-checkbox :name="$key" :label="$label" :checked="$data[$key]??false" />@endforeach</fieldset>
-<x-field name="shipping_cost" label="Costo consegna (€)" :value="$price('shipping_cost_cents')" inputmode="decimal" hint="Vuoto: costo da definire. Zero: gratuito. Specifica sotto se il costo comprende o esclude l’IVA." />
+<x-field name="shipping_cost" label="Costo consegna legacy (€)" :value="$price('shipping_cost_cents')" inputmode="decimal" hint="Usato soltanto in modalità legacy. Con quotazione dinamica attiva viene utilizzata esclusivamente la tariffa selezionata, senza sommare questo importo. Vuoto: da definire; zero: gratuito. Specifica il trattamento IVA sotto." />
 <div class="mt-5 grid gap-5 sm:grid-cols-2">
 <x-select name="shipping_vat_treatment" label="Trattamento IVA spedizione"><option value="">Da definire</option>@foreach(config('marketplace.vat_treatments') as $value=>$label)<option value="{{ $value }}" @selected(old('shipping_vat_treatment',$data['shipping_vat_treatment']??'')===$value)>{{ $label }}</option>@endforeach</x-select>
 <x-field name="shipping_vat_rate" label="Aliquota IVA spedizione (%)" :value="$vatRate('shipping_vat_rate_basis_points')" inputmode="decimal" hint="Indipendente dall’aliquota merce. Necessaria per spedizione a pagamento con IVA inclusa o esclusa. Ritiro e spedizione gratuita non richiedono aliquota." />

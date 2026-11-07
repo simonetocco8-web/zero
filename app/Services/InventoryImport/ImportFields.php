@@ -10,6 +10,7 @@ use Illuminate\Validation\ValidationException;
 class ImportFields
 {
     public const LABELS = [
+        'length' => 'Lunghezza imballaggio', 'width' => 'Larghezza imballaggio', 'height' => 'Altezza imballaggio', 'weight' => 'Peso lordo imballaggio', 'dimension_unit' => 'Unità dimensioni (cm/mm)', 'weight_unit' => 'Unità peso (kg/g)', 'units_per_parcel' => 'Unità di vendita per collo', 'packing_rule' => 'Regola colli (whole_parcels/pieces_capacity)', 'packaging_type' => 'Tipologia imballaggio',
         'name' => 'Nome prodotto', 'brand' => 'Marca', 'sku' => 'Codice articolo / SKU', 'ean' => 'Codice EAN', 'description' => 'Descrizione', 'category' => 'Categoria',
         'condition' => 'Condizione articolo', 'unit' => 'Unità di vendita', 'province' => 'Provincia', 'quantity' => 'Quantità disponibile', 'zero_price' => 'Prezzo ZeroMagazzino', 'list_price' => 'Prezzo di listino',
         'pickup_available' => 'Ritiro in sede', 'shipping_available' => 'Spedizione disponibile', 'shipping_cost' => 'Costo spedizione', 'delivery_notes' => 'Note consegna',
@@ -18,7 +19,7 @@ class ImportFields
 
     public const REQUIRED = ['name', 'description', 'condition', 'unit', 'province', 'quantity', 'zero_price'];
 
-    public const NUMBERS = ['quantity' => 3, 'zero_price' => 2, 'list_price' => 2, 'shipping_cost' => 2, 'vat_rate' => 2, 'shipping_vat_rate' => 2];
+    public const NUMBERS = ['length' => 3, 'width' => 3, 'height' => 3, 'weight' => 3, 'units_per_parcel' => 3, 'quantity' => 3, 'zero_price' => 2, 'list_price' => 2, 'shipping_cost' => 2, 'vat_rate' => 2, 'shipping_vat_rate' => 2];
 
     public function suggestions(array $headers): array
     {

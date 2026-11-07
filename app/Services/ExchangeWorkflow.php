@@ -8,7 +8,9 @@ use App\Models\ExchangeLine;
 use App\Models\ExchangeVersion;
 use App\Models\InventoryItem;
 use App\Models\Retailer;
+use App\Models\ShippingQuote;
 use App\Models\User;
+use App\Services\Shipping\ShippingQuoteService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -73,7 +75,7 @@ class ExchangeWorkflow
             }
             $products = $this->products($ids, [$aId, $bId], $retailers);
             $expiry = $this->expiry();
-            [$snapshot,$lines] = $this->rules->proposal($input, $retailers[$aId], $retailers[$bId], $products, $plans, $expiry);
+            [$snapshot,$lines] = $this->rules->proposal($input, $retailers[$aId], $retailers[$bId], $products, $plans, $expiry, $actor);
             $e = Exchange::create(['uuid' => (string) Str::uuid(), 'request_key' => $key, 'request_hash' => $hash, 'retailer_a_id' => $aId, 'retailer_b_id' => $bId, 'requested_item_id' => $requested->id, 'status' => 'proposed', 'expires_at' => $expiry]);
             $this->version($e, $actor, $input, $snapshot, $lines, 1);
             $this->event($e, 'proposed', $actor);
@@ -178,8 +180,13 @@ class ExchangeWorkflow
             $plans = ['a' => $this->rules->eligible($rs[$e->retailer_a_id]), 'b' => $this->rules->eligible($rs[$e->retailer_b_id])];
             $this->stock->release($v);
             $expiry = $this->expiry();
-            [$snapshot,$rows] = $this->rules->proposal($input, $rs[$e->retailer_a_id], $rs[$e->retailer_b_id], $products, $plans, $expiry);
+            [$snapshot,$rows] = $this->rules->proposal($input, $rs[$e->retailer_a_id], $rs[$e->retailer_b_id], $products, $plans, $expiry, $actor);
             $new = $this->version($e, $actor, $input, $snapshot, $rows, $v->number + 1);
+            foreach ([$v->delivery_a, $v->delivery_b] as $oldDelivery) {
+                if ($ref = $oldDelivery['shipping_quote']['id'] ?? null) {
+                    ShippingQuote::whereKey($ref)->where('status', 'valid')->update(['status' => 'expired']);
+                }
+            }
             $e->update(['status' => 'countered']);
             $this->event($e, 'countered', $actor, $new->id);
 
@@ -212,12 +219,36 @@ class ExchangeWorkflow
                     $this->rules->fail('delivery', 'La modalità di consegna non è più disponibile. Crea una nuova versione.');
                 }
             }
+            if (config('shipping.enabled')) {
+                $shipping = app(ShippingQuoteService::class);
+                foreach (['a', 'b'] as $side) {
+                    $delivery = $side === 'a' ? $v->delivery_a : $v->delivery_b;
+                    if ($delivery['mode'] !== 'shipping') {
+                        continue;
+                    }
+                    $ref = $delivery['shipping_quote'] ?? null;
+                    if (! $ref) {
+                        $shipping->fail('Versione legacy: crea una nuova controproposta con preventivi aggiornati.');
+                    }
+                    $owner = $rs[$side === 'a' ? $e->retailer_a_id : $e->retailer_b_id];
+                    $recipient = $rs[$side === 'a' ? $e->retailer_b_id : $e->retailer_a_id];
+                    $shipment = $lines->where('side', $side)->map(fn ($row) => ['product' => $products[$row->inventory_item_id], 'quantity_milliunits' => $row->quantity_milliunits])->values()->all();
+                    $shipping->valid(User::findOrFail($ref['owner_user_id']), $ref['id'], $owner, $shipment, $shipping->origin($recipient), $ref['context'], true);
+                    // Until fiscal/funds-flow approval, dynamic shipping exchanges remain informational.
+                    $shipping->checkoutAllowed();
+                }
+            }
             $v->acceptances()->create(['retailer_id' => $actor->retailer->id, 'user_id' => $actor->id, 'summary_hash' => $v->summary_hash]);
             $this->event($e, 'accepted_by', $actor);
             if ($v->acceptances()->lockForUpdate()->get()->count() < 2) {
                 $e->update(['status' => 'awaiting_acceptance']);
 
                 return $e;
+            }
+            foreach ([$v->delivery_a, $v->delivery_b] as $delivery) {
+                if ($reference = $delivery['shipping_quote']['id'] ?? null) {
+                    ShippingQuote::whereKey($reference)->update(['status' => 'used', 'used_at' => now()]);
+                }
             }
             $e->update(['status' => 'accepted']);
             $this->event($e, 'accepted');

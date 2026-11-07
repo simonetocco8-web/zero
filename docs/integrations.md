@@ -149,3 +149,7 @@ oltre TTL non viene più chiuso automaticamente per aprirne un altro: la scadenz
 locale non dimostra che Stripe non abbia incassato. Occorre riconciliazione del
 provider prima di segnare esplicitamente expired e consentire un nuovo checkout.
 Riconciliare anche i record storici expired delle release precedenti.
+
+## Quotazioni trasporto Sendcloud v3 — 7 novembre 2026
+
+Adapter Sendcloud API v3 implementato per quotazioni informative; account centralizzato, Basic Auth e uniche chiamate a POST /api/v3/shipping-options. Paccofacile inattivo, fake solo test. Flag UI spento per default e checkout dinamico ancora bloccato; collaudo autenticato delle origini/condizioni commerciali da effettuare quando disponibili credenziali autorizzate. Nessuna etichetta o prenotazione. Contratto, configurazione e attivazione in [sendcloud-v3.md](sendcloud-v3.md).

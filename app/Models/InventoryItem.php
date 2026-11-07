@@ -31,11 +31,12 @@ class InventoryItem extends Model
 
     protected $attributes = ['status' => 'draft', 'condition' => 'new', 'unit' => 'piece', 'currency' => 'EUR', 'pickup_available' => false, 'shipping_available' => false, 'exchange_available' => false];
 
-    protected $fillable = ['category_id', 'shipping_cost_cents', 'delivery_notes', 'vat_treatment', 'vat_rate_basis_points', 'shipping_vat_treatment', 'shipping_vat_rate_basis_points', 'retailer_id', 'name', 'brand', 'category', 'sku', 'ean', 'quantity', 'quantity_milliunits', 'unit', 'currency', 'list_price_cents', 'zero_price_cents', 'condition', 'province', 'pickup_available', 'shipping_available', 'exchange_available', 'description', 'status', 'reviewed_by', 'rejection_reason', 'published_at', 'external_provider', 'external_product_id'];
+    protected $fillable = ['length_mm', 'width_mm', 'height_mm', 'weight_g', 'units_per_parcel_milliunits', 'packing_rule', 'packaging_type', 'category_id', 'shipping_cost_cents', 'delivery_notes', 'vat_treatment', 'vat_rate_basis_points', 'shipping_vat_treatment', 'shipping_vat_rate_basis_points', 'retailer_id', 'name', 'brand', 'category', 'sku', 'ean', 'quantity', 'quantity_milliunits', 'unit', 'currency', 'list_price_cents', 'zero_price_cents', 'condition', 'province', 'pickup_available', 'shipping_available', 'exchange_available', 'description', 'status', 'reviewed_by', 'rejection_reason', 'published_at', 'external_provider', 'external_product_id'];
 
     protected function casts(): array
     {
         return [
+            'length_mm' => 'integer', 'width_mm' => 'integer', 'height_mm' => 'integer', 'weight_g' => 'integer', 'units_per_parcel_milliunits' => 'integer',
             'proposed_data' => 'array', 'proposed_images' => 'array',
             'stock_version' => 'integer', 'proposed_stock_version' => 'integer',
             'vat_rate_basis_points' => ExactIntegerCast::class,
@@ -91,6 +92,9 @@ class InventoryItem extends Model
 
     public function shippingCostLabel(): string
     {
+        if (config('shipping.enabled')) {
+            return 'Preventivo dinamico da calcolare';
+        }
         if ($this->shipping_cost_cents === null) {
             return 'Costo da definire';
         }

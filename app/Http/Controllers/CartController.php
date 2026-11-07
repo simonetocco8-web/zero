@@ -17,14 +17,14 @@ class CartController extends Controller
 
     public function store(CartItemRequest $request, InventoryItem $item, MarketplaceCart $carts)
     {
-        $carts->save($request->user(), $item, $request->validated('quantity'), $request->validated('delivery_mode'));
+        $carts->save($request->user(), $item, $request->validated('quantity'), $request->validated('delivery_mode'), true, $request->validated('shipping_quote_id'));
 
         return to_route('cart.index')->with('status', 'Prodotto aggiunto al carrello.');
     }
 
     public function update(CartItemRequest $request, CartItem $cartItem, MarketplaceCart $carts)
     {
-        $carts->save($request->user(), $cartItem->product, $request->validated('quantity'), $request->validated('delivery_mode'), false);
+        $carts->save($request->user(), $cartItem->product, $request->validated('quantity'), $request->validated('delivery_mode'), false, $request->validated('shipping_quote_id'));
 
         return to_route('cart.index')->with('status', 'Carrello aggiornato.');
     }

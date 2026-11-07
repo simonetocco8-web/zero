@@ -7,6 +7,7 @@ use App\Models\InventoryItem;
 use App\Models\Plan;
 use App\Models\Retailer;
 use App\Services\InventoryImport\ValidationSnapshot;
+use App\Services\Shipping\ShippingPackaging;
 use App\Support\ExactInteger;
 use Brick\Math\BigDecimal;
 use Illuminate\Support\Arr;
@@ -14,8 +15,9 @@ use Illuminate\Validation\ValidationException;
 
 class InventoryRules
 {
-    public function data(array $input, ?Category $category = null): array
+    public function data(array $input, ?Category $category = null, ?bool $packagingRequired = null): array
     {
+        $packaging = app(ShippingPackaging::class)->data($input, $packagingRequired);
         $data = Arr::only($input, ['name', 'brand', 'sku', 'ean', 'condition', 'province', 'description', 'delivery_notes', 'vat_treatment']);
         foreach (['', 'shipping_'] as $prefix) {
             $treatment = $input[$prefix.'vat_treatment'] ?? null;
@@ -50,7 +52,7 @@ class InventoryRules
         }
         $data['currency'] = 'EUR';
 
-        return $data;
+        return $data + $packaging;
     }
 
     public function validate(Retailer $retailer, array $data, ?InventoryItem $target = null, ?InventoryCapacity $capacity = null, ?ValidationSnapshot $preview = null): void

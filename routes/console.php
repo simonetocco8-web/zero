@@ -5,6 +5,7 @@ use App\Models\BillingSubscription;
 use App\Models\IntegrationEvent;
 use App\Models\InventoryImport;
 use App\Models\RetailerBankVerification;
+use App\Models\ShippingQuote;
 use App\Models\StorePublication;
 use App\Services\BankVerification\RetailerBankVerificationService;
 use App\Services\ExchangeWorkflow;
@@ -135,3 +136,15 @@ Artisan::command('inventory-imports:cleanup', function () {
     $this->info('File temporanei scaduti eliminati. Storico ed esiti conservati.');
 });
 Schedule::command('inventory-imports:cleanup')->daily()->withoutOverlapping();
+
+Artisan::command('shipping-quotes:prune', function () {
+    ShippingQuote::where('status', 'valid')->where('expires_at', '<=', now())->update(['status' => 'expired']);
+    ShippingQuote::where('expires_at', '<', now()->subDays(config('shipping.retention_days')))->where('status', 'expired')->delete();
+    ShippingQuote::where('status', 'used')->where('expires_at', '<', now()->subDays(config('shipping.retention_days')))->chunkById(100, function ($quotes) {
+        foreach ($quotes as $quote) {
+            $quote->update(['request_snapshot' => []]);
+        }
+    }, 'id');
+    $this->info('Preventivi temporanei scaduti rimossi; snapshot degli ordini preservati.');
+});
+Schedule::command('shipping-quotes:prune')->daily()->withoutOverlapping();

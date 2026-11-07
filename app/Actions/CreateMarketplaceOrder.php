@@ -2,9 +2,11 @@
 
 namespace App\Actions;
 
+use App\Models\CustomerAddress;
 use App\Models\InventoryItem;
 use App\Models\Order;
 use App\Models\Retailer;
+use App\Models\ShippingQuote;
 use App\Models\User;
 use App\Services\CustomerPromotionalBonus;
 use App\Services\MarketplaceCart;
@@ -18,11 +20,11 @@ use Illuminate\Support\Facades\Gate;
 
 class CreateMarketplaceOrder
 {
-    public function handle(User $user, string $key, array $modes, ?int $addressId, string $reviewHash, bool $useBonus = false, bool $useCredit = true): Order
+    public function handle(User $user, string $key, array $modes, ?int $addressId, string $reviewHash, bool $useBonus = false, bool $useCredit = true, ?array $shippingDestination = null): Order
     {
         Gate::forUser($user)->authorize('purchase', User::class);
 
-        return DB::transaction(function () use ($user, $key, $modes, $addressId, $reviewHash, $useBonus, $useCredit) {
+        return DB::transaction(function () use ($user, $key, $modes, $addressId, $reviewHash, $useBonus, $useCredit, $shippingDestination) {
             User::lockForUpdate()->findOrFail($user->id);
             $existing = Order::where('checkout_key', $key)->first();
             if ($existing) {
@@ -38,6 +40,9 @@ class CreateMarketplaceOrder
             }
             InventoryItem::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
             $address = $addressId ? $user->customerAddresses()->lockForUpdate()->findOrFail($addressId) : null;
+            if (! $address && $shippingDestination) {
+                $address = (new CustomerAddress)->forceFill($shippingDestination + ['user_id' => $user->id]);
+            }
             $quotes = app(MarketplaceQuote::class);
             $quote = $quotes->build($user, $modes, $address, true);
             if (! hash_equals($reviewHash, $quotes->hash($quote))) {
@@ -45,9 +50,12 @@ class CreateMarketplaceOrder
             }
             $order = Order::create(collect($quote)->except('groups')->all() + ['checkout_key' => $key, 'user_id' => $user->id, 'customer_snapshot' => $user->only(['name', 'email', 'first_name', 'last_name', 'phone'])]);
             foreach ($quote['groups'] as $group) {
-                $vendor = $order->vendorOrders()->create(collect($group)->except('items')->all() + ['currency' => 'EUR', 'tax_snapshot' => ['provisional' => $group['totals_provisional'], 'shipping_basis' => 'once_per_distinct_line', 'policy' => 'explicit_product_vat_v1', 'shipping_tax' => $group['totals_provisional'] ? 'unresolved' : 'per_line_snapshot']]);
+                $vendor = $order->vendorOrders()->create(collect($group)->except('items')->all() + ['currency' => 'EUR', 'tax_snapshot' => ['provisional' => $group['totals_provisional'], 'shipping_basis' => config('shipping.enabled') ? 'once_per_seller_first_line_allocation' : 'once_per_distinct_line', 'policy' => 'explicit_product_vat_v1', 'shipping_tax' => $group['totals_provisional'] ? 'unresolved' : 'per_line_snapshot']]);
                 foreach ($group['items'] as $line) {
                     $vendor->items()->create($line);
+                    if ($reference = $line['product_snapshot']['shipping_quote']['id'] ?? null) {
+                        ShippingQuote::where('user_id', $user->id)->whereKey($reference)->update(['status' => 'used', 'used_at' => now()]);
+                    }
                 }
             }
             $credit = app(RetailerCredit::class)->reserve($order, $useCredit);
