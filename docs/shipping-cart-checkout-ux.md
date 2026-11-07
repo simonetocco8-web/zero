@@ -31,14 +31,15 @@ Tutti i dati nelle immagini sono fixture locali e le risposte Sendcloud sono sim
 - [Carrello mobile, tema scuro](images/shipping-ux/cart-mobile-dark.png): importi per rivenditore e riepilogo generale.
 - [Checkout informativo desktop](images/shipping-ux/checkout-informativo.png): costi disponibili e assenza della conferma ordine.
 
-Chromium/Playwright: popup a 375 e 1280 px in entrambi i temi; carrello a 320/375/768/1280 px in entrambi i temi. Verificati contrasto anche in hover, assenza di overflow orizzontale, WCAG 2 A/AA e 2.1 AA con axe (zero violazioni nelle pagine/pannelli verificati), errori in italiano, indirizzo salvato/alternativo, focus con Escape, due rivenditori e più prodotti del primo, selezione/modifica dal carrello e riepilogo bloccato. Nessun errore JavaScript. Il limite di 10 richieste/minuto rimane attivo durante le prove.
+Chromium/Playwright: popup a 375 e 1280 px in entrambi i temi; carrello a 320/375/768/1280 px in entrambi i temi. Verificati contrasto anche in hover, assenza di overflow orizzontale, WCAG 2 A/AA e 2.1 AA con axe (zero violazioni nelle pagine/pannelli verificati), errori in italiano, indirizzo salvato/alternativo, focus con Escape, due rivenditori e più prodotti del primo, selezione/modifica dal carrello e riepilogo bloccato. Nessun errore JavaScript. Il limite di 10 richieste/minuto rimane attivo durante le prove. Verificata anche la selezione in corso in due calcolatori: ogni gruppo radio ha un nome distinto e la scelta del primo rivenditore rimane selezionata dopo aver scelto il servizio del secondo.
 
 ## Test automatici
 
 12 nuovi test coprono riepiloghi incompleti, colli multipli, due venditori, cambio servizio, scadenza, modifiche a imballaggi/quantità/destinazione, ritiro, arrotondamento IVA, importi fiscali sconosciuti, ownership, importi browser non attendibili, checkout informativo senza ordini/riserve/pagamenti, compatibilità legacy e payload Sendcloud completo con UI semplificata.
 
 - Mirati MySQL: 67 superati, 546 asserzioni.
-- Suite complete MySQL/SQLite: risultati finali nella PR.
+- Suite completa MySQL: 777 superati, 5.523 asserzioni.
+- Suite completa SQLite: 745 superati, 32 esclusi perché richiedono MySQL, 5.215 asserzioni.
 - Pint su tutti i file PHP versionati e nuovi: superato.
 - Build Vite: superata.
 
