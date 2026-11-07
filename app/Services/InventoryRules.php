@@ -6,15 +6,15 @@ use App\Models\Category;
 use App\Models\InventoryItem;
 use App\Models\Plan;
 use App\Models\Retailer;
+use App\Services\InventoryImport\ValidationSnapshot;
 use App\Support\ExactInteger;
 use Brick\Math\BigDecimal;
-use Brick\Math\BigInteger;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
 class InventoryRules
 {
-    public function data(array $input): array
+    public function data(array $input, ?Category $category = null): array
     {
         $data = Arr::only($input, ['name', 'brand', 'sku', 'ean', 'condition', 'province', 'description', 'delivery_notes', 'vat_treatment']);
         foreach (['', 'shipping_'] as $prefix) {
@@ -27,7 +27,7 @@ class InventoryRules
             $data[$prefix.'vat_rate_basis_points'] = $value === null || $value === '' ? null : BigDecimal::of(str_replace(',', '.', (string) $value))->multipliedBy(100)->toBigInteger()->toInt();
         }
         $this->validateVat($data);
-        $category = Category::findOrFail($input['category_id']);
+        $category ??= Category::findOrFail($input['category_id']);
         $data['category_id'] = $category->id;
         $data['category'] = $category->name; // Legacy snapshot, retained for compatibility.
         $data['unit'] = $input['unit'] ?? 'piece';
@@ -53,13 +53,13 @@ class InventoryRules
         return $data;
     }
 
-    public function validate(Retailer $retailer, array $data, ?InventoryItem $target = null): void
+    public function validate(Retailer $retailer, array $data, ?InventoryItem $target = null, ?InventoryCapacity $capacity = null, ?ValidationSnapshot $preview = null): void
     {
         if ($target && $data['quantity_milliunits'] < $target->quantity_milliunits - app(StockReservations::class)->available($target)) {
             $this->fail('quantity', 'La quantità fisica non può essere inferiore alle prenotazioni attive.');
         }
         if (isset($data['category_id'])) {
-            $category = Category::sharedLock()->find($data['category_id']);
+            $category = $preview ? $preview->categories->get($data['category_id']) : Category::sharedLock()->find($data['category_id']);
             $existingIds = [$target?->category_id, $target?->proposed_data['category_id'] ?? null];
             if (! $category || (! $category->is_active && ! in_array($category->id, $existingIds, true))) {
                 $this->fail('category_id', 'Seleziona una categoria attiva.');
@@ -71,46 +71,17 @@ class InventoryRules
             $this->fail('shipping_cost', 'Il costo deve essere non negativo.');
         }
         $this->validateVat($data);
-        $subscription = $retailer->activeSubscription()->with('plan')->lockForUpdate()->first();
+        $subscription = $preview?->subscription ?? $retailer->activeSubscription()->with('plan')->lockForUpdate()->first();
         if (! $subscription || ($subscription->ends_at && $subscription->ends_at <= now()) || ($subscription->starts_at && $subscription->starts_at > now())) {
             $this->fail('plan', 'È necessario un piano attivo per gestire le giacenze.');
         }
-        $plan = Plan::sharedLock()->findOrFail($subscription->plan_id);
+        $plan = $preview?->plan ?? Plan::sharedLock()->findOrFail($subscription->plan_id);
         if ($data['exchange_available'] && ! $plan->exchange_available) {
             $this->fail('exchange_available', 'Lo scambio richiede un piano PRO attivo.');
         }
-        // Current locking read: MySQL REPEATABLE READ snapshots may predate the retailer lock.
-        $allItems = $retailer->inventoryItems()->withTrashed()->lockForUpdate()->get();
-        if (! empty($data['sku']) && $allItems->contains(fn ($item) => $item->id !== $target?->id && $item->sku === $data['sku'])) {
-            $this->fail('sku', 'Il codice è già usato da un’altra giacenza.');
-        }
-        $items = $allItems->filter(fn ($item) => ! $item->trashed() && $item->status->value !== 'archived');
-        if (! $target && $plan->max_items !== null && $items->count() >= $plan->max_items) {
-            $this->fail('plan', 'Hai raggiunto il limite di '.$plan->max_items.' articoli.');
-        }
-        $sum = BigInteger::zero();
-        foreach ($items as $item) {
-            $candidate = $item->id === $target?->id ? $data : ($item->proposed_data ?? $item->getAttributes());
-            if ($item->id !== $target?->id && ! empty($data['sku']) && ($item->sku === $data['sku'] || ($item->proposed_data['sku'] ?? null) === $data['sku'])) {
-                $this->fail('sku', 'Il codice è già usato da un’altra giacenza.');
-            }
-            $value = $this->value($candidate);
-            if ($item->published_at) {
-                $value = BigInteger::max($value, $this->value($item->getAttributes()));
-            }
-            $sum = $sum->plus($value);
-        }
-        if (! $target) {
-            $sum = $sum->plus($this->value($data));
-        }
-        if ($plan->max_inventory_value_cents !== null && $sum->isGreaterThan(BigInteger::of($plan->max_inventory_value_cents)->multipliedBy(1000))) {
-            $this->fail('quantity', 'Il valore totale del magazzino supera il limite del piano.');
-        }
-    }
-
-    private function value(array $data): BigInteger
-    {
-        return BigInteger::of($data['quantity_milliunits'])->multipliedBy($data['zero_price_cents']);
+        // The batch projection is built after taking the same retailer lock used by all inventory writers.
+        $capacity ??= new InventoryCapacity($plan, $retailer->inventoryItems()->withTrashed()->lockForUpdate()->get());
+        $capacity->validate($data, $target);
     }
 
     private function validateVat(array $data): void

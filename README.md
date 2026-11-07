@@ -153,3 +153,7 @@ Regole: [AGENTS.md](AGENTS.md). Specifiche: [requirements](docs/requirements.md)
 ## cPanel senza SSH o Terminale
 
 Per la sola prima installazione tramite File Manager: [procedura cPanel senza CLI](docs/cpanel-no-ssh-deployment.md). Il workflow manuale **Build deploy package** genera `zeromagazzino-deploy.zip` con vendor e asset; un installer web temporaneo, disabilitato senza `ZERO_INSTALL_TOKEN`, esegue migration/PlanSeeder/cache e deve essere eliminato dopo l’uso. Queue e scheduler richiedono comunque un servizio del provider; il pacchetto non esegue deployment automatici.
+
+## Caricamento massivo giacenze CSV
+
+L’area Vendite permette ai rivenditori approvati di associare le colonne di un CSV, verificare l’anteprima, salvare bozze o inviare in approvazione, consultare storico/report e riutilizzare modelli privati. Richiede il worker asincrono `inventory-imports` oltre ai processi già previsti. Procedura utente, limiti, configurazione, sicurezza e aggiornamento additivo cPanel in [docs/inventory-csv-imports.md](docs/inventory-csv-imports.md).
