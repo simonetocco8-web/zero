@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\MarketplaceRequest;
+use App\Http\Requests\PurchaseEstimateRequest;
 use App\Models\Category;
 use App\Models\InventoryItem;
 use App\Models\User;
 use App\Services\InventoryPhotos;
+use App\Services\MarketplaceCart;
 use App\Services\MarketplaceCatalog;
 use App\Services\PublicInventory;
+use App\Services\PurchaseSummary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -60,13 +63,18 @@ class MarketplaceController extends Controller
         return Storage::disk('local')->response($image->path, null, ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
     }
 
-    public function purchase(InventoryItem $item)
+    public function purchase(PurchaseEstimateRequest $request, InventoryItem $item)
     {
         Gate::authorize('viewPublic', $item);
 
-        abort_if($item->retailer->user_id === request()->user()->id, 403);
+        abort_if($item->retailer->user_id === $request->user()->id, 403);
 
-        return view('cart.add', compact('item'));
+        $data = $request->validated();
+        $quantity = app(MarketplaceCart::class)->quantity($data['quantity'] ?? '1');
+        $mode = $data['delivery_mode'] ?? ($item->pickup_available ? 'pickup' : 'shipping');
+        app(MarketplaceCart::class)->validate($request->user(), $item, $quantity, $mode);
+
+        return view('cart.add', ['item' => $item, 'quantity' => $quantity, 'mode' => $mode, 'summary' => app(PurchaseSummary::class)->product($request->user(), $item, $quantity, $mode)]);
     }
 
     public function exchange(InventoryItem $item, Request $request, MarketplaceCatalog $catalog)

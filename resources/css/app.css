@@ -213,3 +213,12 @@
 @media (min-width: 640px) and (max-width: 1279px) {
     .admin-stock-table tbody tr { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Keep the primary action legible while hovered in both themes. */
+.btn-primary:hover:not(:disabled) { background-color: #096b60; color: #ffffff; }
+.btn-primary { transition-property: box-shadow; }
+/* Non-text contrast for calculator control outlines and white selection marks. */
+.shipping-dialog { --color-control: #73818f; }
+.shipping-dialog input[type='checkbox'], .shipping-dialog input[type='radio'] { color: #087f70; }
+.shipping-dialog .field:focus { border-color: var(--color-brand-700); }
+.shipping-dialog :focus-visible { outline-color: var(--color-brand-700); --tw-ring-color: var(--color-brand-700); }

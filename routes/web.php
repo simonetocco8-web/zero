@@ -40,6 +40,7 @@ Route::middleware(['auth', EnsureMarketplaceAccess::class])->group(function () {
     Route::get('marketplace/prodotto/{item}', [MarketplaceController::class, 'show'])->whereNumber('item')->name('marketplace.show');
     Route::get('marketplace/prodotto/{item}/immagini/{position}', [MarketplaceController::class, 'image'])->whereNumber('item')->whereNumber('position')->name('marketplace.image');
     Route::get('marketplace/prodotto/{item}/acquista', [MarketplaceController::class, 'purchase'])->middleware(['auth', 'can:purchase,'.User::class])->whereNumber('item')->name('marketplace.purchase');
+    Route::post('marketplace/prodotto/{item}/acquista/stima', [MarketplaceController::class, 'purchase'])->middleware(['auth', 'can:purchase,'.User::class])->whereNumber('item')->name('marketplace.purchase.preview');
     Route::get('marketplace/prodotto/{item}/scambio', [MarketplaceController::class, 'exchange'])->middleware('auth')->whereNumber('item')->name('marketplace.exchange');
     Route::get('products/{item}/request', [AvailabilityController::class, 'create'])->name('availability.create');
     Route::post('products/{item}/request', [AvailabilityController::class, 'store'])->middleware('throttle:availability')->name('availability.store');

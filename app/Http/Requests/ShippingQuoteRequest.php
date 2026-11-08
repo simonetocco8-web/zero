@@ -13,6 +13,16 @@ class ShippingQuoteRequest extends FormRequest
         return $this->user()->can('purchase', User::class);
     }
 
+    public function messages(): array
+    {
+        return ['quantity.required_with' => 'Indica la quantità da spedire.', 'address_id.exists' => 'Scegli un indirizzo della tua rubrica.'];
+    }
+
+    public function attributes(): array
+    {
+        return ['quantity' => 'quantità', 'address_id' => 'indirizzo salvato'];
+    }
+
     public function rules(): array
     {
         return [
