@@ -90,6 +90,24 @@ class SendcloudShippingIntegrationTest extends TestCase
         }
     }
 
+    public function test_failed_calculation_preserves_cart_prices_and_does_not_create_an_order(): void
+    {
+        $seller = $this->seller();
+        $product = $this->product($seller);
+        $buyer = $this->buyer();
+        $cart = app(MarketplaceCart::class);
+        $cart->save($buyer, $product, '1', 'pickup');
+        $before = $cart->cart($buyer)->items()->sole()->getAttributes();
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
+        Http::fake([SendcloudShippingProvider::ENDPOINT => Http::response(['data' => []])]);
+        $this->actingAs($buyer)->postJson(route('shipping.quote'), ['item_id' => $product->id, 'quantity' => '1', 'address' => $this->destination()])
+            ->assertUnprocessable()->assertJsonPath('error.code', 'SHIPPING_NO_RATES')->assertJsonPath('error.retryable', false);
+        $this->assertSame($before, $cart->cart($buyer)->items()->sole()->getAttributes());
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('shipping_quotes', 0);
+    }
+
     public function test_product_quotes_use_default_address_cache_and_owner_selection_without_enabling_checkout(): void
     {
         $seller = $this->seller();

@@ -96,6 +96,7 @@ jobs:
         run: |
           npm ci
           npm run build
+          npm run test:shipping
       - name: Suite MySQL con concorrenza
         run: php artisan test --compact --no-ansi
       - name: Suite SQLite

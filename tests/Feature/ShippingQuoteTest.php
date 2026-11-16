@@ -165,7 +165,7 @@ class ShippingQuoteTest extends TestCase
         $p = $this->product();
         $this->actingAs($u)->postJson(route('shipping.quote'), ['item_id' => $p->id, 'quantity' => '1'])->assertUnprocessable();
         $p->retailer->update(['postal_code' => null]);
-        $this->invalid(fn () => $this->rates($u, $p), 'postal_code');
+        $this->invalid(fn () => $this->rates($u, $p), 'shipping');
         $this->assertSame(0, ShippingQuote::count());
     }
 

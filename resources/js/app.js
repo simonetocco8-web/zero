@@ -1,4 +1,7 @@
 import Alpine from 'alpinejs';
+import { quoteState, requestQuotes, validQuotes, failure, exchangeShipping } from './shipping';
+
+Alpine.data('exchangeShipping', exchangeShipping);
 
 Alpine.data('categoryMenu', () => ({
     open: false,
@@ -43,16 +46,18 @@ Alpine.data('reviewsSlider', () => ({
 }));
 
 Alpine.data('shippingCalculator', ({ endpoint, csrf }) => ({
-    busy: false, error: '', fieldErrors: {}, rates: [], informational: false,
-    selected: '', alternate: false, version: 0, controller: null,
+    ...quoteState(), rates: [], informational: false,
+    selected: '', alternate: false,
     invalidate() {
-        this.version++;
-        this.controller?.abort();
-        this.busy = false;
+        quoteState().invalidate.call(this);
         this.rates = [];
         this.selected = '';
-        this.error = '';
-        this.fieldErrors = {};
+    },
+    showError(error) {
+        quoteState().showError.call(this, error);
+        if (!this.alternate && (error.fields || []).some(field => ['recipient_name', 'address_line_1', 'postal_code', 'city', 'province', 'country_code'].includes(field.replace(/^address\./, '')))) {
+            this.fieldErrors.address_id = error.message + ' Modifica l’indirizzo nella rubrica oppure usa un altro indirizzo.';
+        }
     },
     money(cents) { return (cents / 100).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }); },
     cheapest() { return Math.min(...this.rates.map(q => q.rate.final_cents)); },
@@ -65,28 +70,34 @@ Alpine.data('shippingCalculator', ({ endpoint, csrf }) => ({
         return 'Tempi di consegna da confermare';
     },
     async calculate() {
+        if (this.busy) return;
         this.invalidate();
         const version = this.version;
-        this.controller = new AbortController();
+        const controller = this.controller = new AbortController();
         this.busy = true;
-        const form = new FormData(this.$refs.calculation);
-        if (!this.alternate) { for (const key of [...form.keys()]) if (key.startsWith('address[')) form.delete(key); }
-        else form.delete('address_id');
         try {
-            const response = await fetch(endpoint, { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf }, body: form, signal: this.controller.signal });
-            const result = await response.json();
+            const form = new FormData(this.$refs.calculation);
+            if (!this.alternate) { for (const key of [...form.keys()]) if (key.startsWith('address[')) form.delete(key); }
+            else form.delete('address_id');
+            const result = await requestQuotes(endpoint, csrf, form, controller, validQuotes);
             if (version !== this.version) return;
-            if (!response.ok) {
-                const errors = result.errors || {};
-                for (const [key, messages] of Object.entries(errors)) this.fieldErrors[key.replace(/^address\./, '')] = messages.join(' ');
-                throw new Error(Object.values(errors).flat().join(' ') || 'Calcolo non disponibile. Riprova tra poco.');
-            }
             this.rates = result.quotes;
             this.informational = result.informational;
-            if (!this.rates.length) this.error = 'Nessuna tariffa disponibile per questa spedizione. Controlla indirizzo e quantità.';
+            if (!this.rates.length) this.showError(failure('SHIPPING_NO_RATES', false));
         } catch (error) {
-            if (error.name !== 'AbortError' && version === this.version) this.error = error.message || 'Connessione non disponibile. Riprova.';
-        } finally { if (version === this.version) this.busy = false; }
+            if (version === this.version) this.showError(error?.code ? error : failure('SHIPPING_UNEXPECTED'));
+        } finally {
+            if (version === this.version) {
+                this.busy = false;
+                if (this.error) {
+                    await this.$nextTick();
+                    // x-show reveals content on the next animation frame.
+                    requestAnimationFrame(() => requestAnimationFrame(() => {
+                        if (version === this.version) this.$refs.dialog.scrollTop = this.$refs.dialog.scrollHeight;
+                    }));
+                }
+            }
+        }
     },
 }));
 

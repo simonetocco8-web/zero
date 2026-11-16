@@ -5,14 +5,17 @@ namespace App\Services\Shipping;
 use App\Contracts\ShippingQuoteContextProviderInterface;
 use App\Contracts\ShippingQuoteProviderInterface;
 use Brick\Math\BigDecimal;
+use GuzzleHttp\Exception\ConnectTimeoutException;
+use GuzzleHttp\Exception\NetworkTimeoutException;
+use GuzzleHttp\Exception\ResponseTimeoutException;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 
 class SendcloudShippingProvider implements ShippingQuoteContextProviderInterface, ShippingQuoteProviderInterface
 {
@@ -34,16 +37,16 @@ class SendcloudShippingProvider implements ShippingQuoteContextProviderInterface
     {
         // A transaction guard also protects future callers from accidentally doing HTTP under locks.
         if (DB::transactionLevel() !== 0) {
-            $this->fail('Il preventivo Sendcloud deve essere richiesto prima della transazione di conferma.');
+            throw new ShippingFailure('SHIPPING_CONFIGURATION');
         }
         $payload = $this->payload($shipment);
         $credentials = $this->accounts->credentials($shipment['retailer_id']);
         if (! is_string($credentials['public_key']) || $credentials['public_key'] === '' || ! is_string($credentials['private_key']) || $credentials['private_key'] === '') {
-            $this->fail('Quotazione Sendcloud non configurata. Contatta l’assistenza.');
+            throw new ShippingFailure('SHIPPING_CONFIGURATION');
         }
         $timeout = config('shipping.sendcloud.timeout');
         if (! is_int($timeout) || $timeout < 1 || $timeout > 20) {
-            $this->fail('Timeout Sendcloud non configurato correttamente.');
+            throw new ShippingFailure('SHIPPING_CONFIGURATION');
         }
         $scope = 'sendcloud:'.$this->context($shipment['retailer_id']);
         $this->throttle($scope);
@@ -52,8 +55,13 @@ class SendcloudShippingProvider implements ShippingQuoteContextProviderInterface
             $response = Http::withBasicAuth($credentials['public_key'], $credentials['private_key'])
                 ->acceptJson()->asJson()->connectTimeout(min(5, $timeout))->timeout($timeout)
                 ->withoutRedirecting()->withOptions(['verify' => true])->post(self::ENDPOINT, $payload);
-        } catch (ConnectionException) {
-            $this->fail('Sendcloud non risponde entro il tempo previsto. Riprova tra poco.');
+        } catch (ConnectionException $exception) {
+            // Guzzle 8 (locked dependency) exposes typed transport timeouts.
+            $previous = $exception->getPrevious();
+            $timeout = $previous instanceof ConnectTimeoutException
+                || $previous instanceof NetworkTimeoutException
+                || $previous instanceof ResponseTimeoutException;
+            throw new ShippingFailure($timeout ? 'SHIPPING_TIMEOUT' : 'SHIPPING_NETWORK');
         }
         if ($response->status() === 429) {
             $retry = $response->header('Retry-After');
@@ -61,27 +69,37 @@ class SendcloudShippingProvider implements ShippingQuoteContextProviderInterface
             Cache::put($scope.':cooldown', true, max(1, min(3600, $seconds)));
         }
         if (! $response->successful()) {
-            $this->fail(match ($response->status()) {
-                400, 422 => 'Sendcloud non può quotare questi indirizzi o imballaggi. Verifica i dati di spedizione.',
-                401, 403 => 'Quotazione Sendcloud non autorizzata. Contatta l’assistenza.',
-                429 => 'Limite di richieste Sendcloud raggiunto. Attendi prima di riprovare.',
-                default => 'Servizio di quotazione Sendcloud temporaneamente non disponibile. Riprova tra poco.',
-            });
+            if (in_array($response->status(), [400, 422], true)) {
+                $this->validationFailure($response);
+            }
+            throw new ShippingFailure(match ($response->status()) {
+                400, 422 => 'SHIPPING_INVALID_DATA',
+                401, 403 => 'SHIPPING_CONFIGURATION',
+                429 => 'SHIPPING_RATE_LIMITED',
+                default => 'SHIPPING_UNAVAILABLE',
+            }, diagnostics: ['provider' => 'sendcloud', 'http_status' => $response->status()]);
         }
         if (strlen($response->body()) > 2097152) {
-            $this->fail('Risposta Sendcloud non valida.');
+            throw new ShippingFailure('SHIPPING_INVALID_RESPONSE');
         }
         try {
             $root = json_decode($response->body(), false, 64, JSON_THROW_ON_ERROR);
             $body = json_decode($response->body(), true, 64, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
-            $this->fail('Risposta Sendcloud non valida.');
+            throw new ShippingFailure('SHIPPING_INVALID_RESPONSE');
         }
         if (! $root instanceof \stdClass || ! property_exists($root, 'data') || ($root->data !== null && ! is_array($root->data)) || ! is_array($body) || ! array_key_exists('data', $body) || ($body['data'] !== null && (! is_array($body['data']) || ! array_is_list($body['data']))) || count($body['data'] ?? []) > 1000) {
-            $this->fail('Risposta Sendcloud non valida.');
+            throw new ShippingFailure('SHIPPING_INVALID_RESPONSE');
         }
         $rates = [];
+        $quoteErrors = [];
         foreach ($body['data'] ?? [] as $option) {
+            if (is_array($option) && is_array($option['quote_error'] ?? null)) {
+                $code = $option['quote_error']['code'] ?? null;
+                if (in_array($code, ['carrier_api_error', 'carrier_api_unavailable', 'carrier_auth_failed', 'internal_error'], true)) {
+                    $quoteErrors[] = $code;
+                }
+            }
             if (! is_array($option) || ! $this->compatible($option, $shipment['parcels'])) {
                 continue;
             }
@@ -93,19 +111,45 @@ class SendcloudShippingProvider implements ShippingQuoteContextProviderInterface
             }
         }
 
+        if ($rates === [] && $quoteErrors !== []) {
+            throw new ShippingFailure(in_array('carrier_auth_failed', $quoteErrors, true) ? 'SHIPPING_CONFIGURATION' : 'SHIPPING_UNAVAILABLE', diagnostics: ['provider' => 'sendcloud', 'quote_error_codes' => array_values(array_unique($quoteErrors))]);
+        }
+
         return array_values($rates);
+    }
+
+    private function validationFailure(Response $response): never
+    {
+        $fields = [];
+        $code = 'SHIPPING_INVALID_DATA';
+        // Only documented JSON:API source pointers and codes; never inspect human detail text.
+        $body = strlen($response->body()) <= 2097152 ? json_decode($response->body(), true, 64) : null;
+        foreach (is_array($body['errors'] ?? null) ? array_slice($body['errors'], 0, 100) : [] as $error) {
+            if (! is_array($error)) {
+                continue;
+            }
+            $pointer = $error['source']['pointer'] ?? null;
+            if (! is_string($pointer) || ! preg_match('~^/to_address/(postal_code|city|country_code|address_line_1|state_province_code)$~D', $pointer, $match)) {
+                continue;
+            }
+            $fields[] = $match[1] === 'state_province_code' ? 'province' : $match[1];
+            if (($error['code'] ?? null) === 'required') {
+                $code = 'SHIPPING_INCOMPLETE_ADDRESS';
+            }
+        }
+        throw new ShippingFailure($code, array_values(array_unique($fields)), ['provider' => 'sendcloud', 'http_status' => $response->status()]);
     }
 
     public function payload(array $shipment): array
     {
         if (! isset($shipment['retailer_id']) || ! is_int($shipment['retailer_id']) || ! isset($shipment['parcels']) || ! is_array($shipment['parcels']) || ! array_is_list($shipment['parcels']) || count($shipment['parcels']) < 1 || count($shipment['parcels']) > 50) {
-            $this->fail('Sendcloud richiede da 1 a 50 colli per spedizione.');
+            throw new ShippingFailure('SHIPPING_INVALID_DATA');
         }
         $parcels = [];
         foreach ($shipment['parcels'] as $parcel) {
             foreach (['length_mm', 'width_mm', 'height_mm', 'weight_g'] as $key) {
                 if (! is_array($parcel) || ! isset($parcel[$key]) || ! is_int($parcel[$key]) || $parcel[$key] <= 0 || $parcel[$key] > ($key === 'weight_g' ? 1000000 : 10000)) {
-                    $this->fail('Dimensioni o peso dei colli non validi per la quotazione.');
+                    throw new ShippingFailure('SHIPPING_INVALID_DATA');
                 }
             }
             $parcels[] = ['dimensions' => [
@@ -113,7 +157,7 @@ class SendcloudShippingProvider implements ShippingQuoteContextProviderInterface
             ], 'weight' => ['value' => $this->decimal($parcel['weight_g'], 1000, 3), 'unit' => 'kg']];
         }
         if (! is_array($shipment['origin'] ?? null) || ! is_array($shipment['destination'] ?? null)) {
-            $this->fail('Indirizzi Sendcloud non validi.');
+            throw new ShippingFailure('SHIPPING_INVALID_DATA');
         }
 
         return ['from_address' => $this->address($shipment['origin'] ?? []), 'to_address' => $this->address($shipment['destination'] ?? []), 'parcels' => $parcels, 'calculate_quotes' => true];
@@ -123,7 +167,7 @@ class SendcloudShippingProvider implements ShippingQuoteContextProviderInterface
     {
         $validator = Validator::make($address, ['country_code' => ['required', 'regex:/^[A-Z]{2}$/D'], 'postal_code' => ['required', 'string', 'max:32'], 'city' => ['required', 'string', 'max:255'], 'province' => ['required', 'string', 'max:80'], 'address_line_1' => ['required', 'string', 'max:255'], 'address_line_2' => ['nullable', 'string', 'max:255']]);
         if ($validator->fails()) {
-            $this->fail('Completa Paese, CAP, città, provincia e indirizzo per la quotazione Sendcloud.');
+            throw new ShippingFailure('SHIPPING_INVALID_DATA');
         }
         $province = strtoupper(trim($address['province']));
         $country = $address['country_code'];
@@ -131,7 +175,7 @@ class SendcloudShippingProvider implements ShippingQuoteContextProviderInterface
             $province = $country.'-'.$province;
         }
         if (! preg_match('/^'.preg_quote($country, '/').'-[A-Z0-9]{1,3}$/D', $province)) {
-            $this->fail('Indica la provincia con sigla o codice ISO 3166-2 per Sendcloud.');
+            throw new ShippingFailure('SHIPPING_INVALID_DATA');
         }
 
         return ['country_code' => $country, 'postal_code' => $address['postal_code'], 'city' => $address['city'], 'state_province_code' => $province, 'address_line_1' => trim($address['address_line_1'].(! empty($address['address_line_2']) ? ', '.$address['address_line_2'] : ''))];
@@ -142,13 +186,13 @@ class SendcloudShippingProvider implements ShippingQuoteContextProviderInterface
         try {
             Cache::lock($scope.':limiter', 5)->block(1, function () use ($scope) {
                 if (Cache::has($scope.':cooldown') || RateLimiter::tooManyAttempts($scope.':minute', 80) || RateLimiter::tooManyAttempts($scope.':second', 8)) {
-                    $this->fail('Limite di richieste Sendcloud raggiunto. Attendi prima di riprovare.');
+                    throw new ShippingFailure('SHIPPING_RATE_LIMITED');
                 }
                 RateLimiter::hit($scope.':minute', 60);
                 RateLimiter::hit($scope.':second', 1);
             });
         } catch (LockTimeoutException) {
-            $this->fail('Altre quotazioni Sendcloud sono in corso. Riprova tra poco.');
+            throw new ShippingFailure('SHIPPING_IN_PROGRESS');
         }
     }
 
@@ -274,10 +318,5 @@ class SendcloudShippingProvider implements ShippingQuoteContextProviderInterface
     private function decimal(int $value, int $factor, int $scale): string
     {
         return (string) BigDecimal::of($value)->dividedBy($factor, $scale)->strippedOfTrailingZeros();
-    }
-
-    private function fail(string $message): never
-    {
-        throw ValidationException::withMessages(['shipping' => $message]);
     }
 }

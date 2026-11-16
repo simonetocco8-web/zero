@@ -30,7 +30,7 @@ class ShippingQuoteService
         }
         $data['country_code'] = strtoupper($data['country_code'] ?? '');
         $data['province'] = mb_strtoupper($data['province'] ?? '');
-        Validator::make($data, [
+        $validator = Validator::make($data, [
             'recipient_name' => ['required', 'string', 'max:255'],
             'address_line_1' => ['required', 'string', 'max:255'],
             'postal_code' => ['required', 'string', 'regex:/^[A-Za-z0-9 -]{2,32}$/D'],
@@ -38,9 +38,19 @@ class ShippingQuoteService
             'province' => ['required', 'string', 'max:80'],
             'country_code' => ['required', 'regex:/^[A-Z]{2}$/D'],
             'company' => ['nullable', 'string', 'max:255'], 'address_line_2' => ['nullable', 'string', 'max:255'], 'phone' => ['nullable', 'string', 'max:40'],
-        ], [], ['recipient_name' => 'destinatario', 'address_line_1' => 'indirizzo e numero civico', 'postal_code' => 'CAP', 'city' => 'città', 'province' => 'provincia', 'country_code' => 'paese', 'phone' => 'telefono'])->validate();
-        if ($data['country_code'] === 'IT' && (! preg_match('/^[0-9]{5}$/D', $data['postal_code']) || ! preg_match('/^[A-Z]{2}$/D', $data['province']))) {
-            $this->fail('Per l’Italia indica CAP di cinque cifre e sigla provincia di due lettere.');
+        ], [], ['recipient_name' => 'destinatario', 'address_line_1' => 'indirizzo e numero civico', 'postal_code' => 'CAP', 'city' => 'città', 'province' => 'provincia', 'country_code' => 'paese', 'phone' => 'telefono']);
+        if ($validator->fails()) {
+            $fields = array_keys($validator->errors()->toArray());
+            $missing = collect($validator->failed())->contains(fn ($rules) => isset($rules['Required']));
+            throw new ShippingFailure($missing ? 'SHIPPING_INCOMPLETE_ADDRESS' : (in_array('postal_code', $fields, true) ? 'SHIPPING_INVALID_POSTAL_CODE' : 'SHIPPING_INVALID_DATA'), $fields);
+        }
+        if ($data['country_code'] === 'IT') {
+            if (! preg_match('/^[0-9]{5}$/D', $data['postal_code'])) {
+                throw new ShippingFailure('SHIPPING_INVALID_POSTAL_CODE', ['postal_code']);
+            }
+            if (! preg_match('/^[A-Z]{2}$/D', $data['province'])) {
+                throw new ShippingFailure('SHIPPING_INVALID_DATA', ['province']);
+            }
         }
 
         // Stable keys, including absent optional fields, for reliable destination comparisons.
@@ -49,7 +59,12 @@ class ShippingQuoteService
 
     public function origin(Retailer $retailer): array
     {
-        return $this->address(['recipient_name' => $retailer->company_name, 'address_line_1' => $retailer->address, 'postal_code' => $retailer->postal_code, 'city' => $retailer->city, 'province' => $retailer->province, 'country_code' => $retailer->country_code]);
+        try {
+            return $this->address(['recipient_name' => $retailer->company_name, 'address_line_1' => $retailer->address, 'postal_code' => $retailer->postal_code, 'city' => $retailer->city, 'province' => $retailer->province, 'country_code' => $retailer->country_code]);
+        } catch (ValidationException) {
+            // Origin belongs to the seller, never highlight the buyer's destination.
+            throw new ShippingFailure('SHIPPING_CONFIGURATION');
+        }
     }
 
     public function snapshot(Retailer $retailer, array $lines, array $destination, string $context): array
@@ -71,7 +86,7 @@ class ShippingQuoteService
     {
         Gate::forUser($user)->authorize('create', ShippingQuote::class);
         if (! config('shipping.enabled')) {
-            $this->fail('Quotazione dinamica disattivata.');
+            throw new ShippingFailure('SHIPPING_CONFIGURATION');
         }
         $snapshot = $this->snapshot($origin, $lines, $destination, $context);
         $fingerprint = hash('sha256', json_encode($snapshot, JSON_THROW_ON_ERROR));
@@ -89,19 +104,22 @@ class ShippingQuoteService
                 }
                 $rates = $this->provider->quote($snapshot);
                 if (count($rates) > 1000) {
-                    $this->fail('Risposta del provider non valida.');
+                    throw new ShippingFailure('SHIPPING_INVALID_RESPONSE');
                 }
                 $cleanRates = [];
                 foreach ($rates as $rate) {
                     if (! is_array($rate)) {
-                        $this->fail('Risposta del provider non valida.');
+                        throw new ShippingFailure('SHIPPING_INVALID_RESPONSE');
                     }
                     foreach (['original_cents', 'final_cents'] as $field) {
                         if (! isset($rate[$field]) || ! is_int($rate[$field]) || $rate[$field] < 0 || $rate[$field] > 100000000) {
-                            $this->fail('Importo del provider non valido.');
+                            throw new ShippingFailure('SHIPPING_INVALID_RESPONSE');
                         }
                     }
-                    Validator::make($rate, ['carrier' => ['required', 'string', 'max:255'], 'service' => ['required', 'string', 'max:255'], 'currency' => ['required', 'in:EUR'], 'tax_treatment' => ['nullable', 'in:included,excluded,not_applicable'], 'tax_rate_basis_points' => ['nullable', 'integer', 'between:0,10000'], 'conditions' => ['nullable', 'string', 'max:2000'], 'eta' => ['nullable', 'string', 'max:255'], 'shipping_option_code' => ['nullable', 'string', 'max:255'], 'carrier_code' => ['nullable', 'string', 'max:255'], 'contract_id' => ['nullable', 'integer'], 'quote_source' => ['nullable', 'string', 'max:40'], 'price_breakdown' => ['sometimes', 'array', 'max:100'], 'estimated_surcharges' => ['sometimes', 'array', 'max:100'], 'lead_time_hours' => ['nullable', 'integer', 'between:0,87600']])->validate();
+                    $validator = Validator::make($rate, ['carrier' => ['required', 'string', 'max:255'], 'service' => ['required', 'string', 'max:255'], 'currency' => ['required', 'in:EUR'], 'tax_treatment' => ['nullable', 'in:included,excluded,not_applicable'], 'tax_rate_basis_points' => ['nullable', 'integer', 'between:0,10000'], 'conditions' => ['nullable', 'string', 'max:2000'], 'eta' => ['nullable', 'string', 'max:255'], 'shipping_option_code' => ['nullable', 'string', 'max:255'], 'carrier_code' => ['nullable', 'string', 'max:255'], 'contract_id' => ['nullable', 'integer'], 'quote_source' => ['nullable', 'string', 'max:40'], 'price_breakdown' => ['sometimes', 'array', 'max:100'], 'estimated_surcharges' => ['sometimes', 'array', 'max:100'], 'lead_time_hours' => ['nullable', 'integer', 'between:0,87600']]);
+                    if ($validator->fails()) {
+                        throw new ShippingFailure('SHIPPING_INVALID_RESPONSE');
+                    }
                     $rate = array_intersect_key($rate, array_flip(['carrier', 'service', 'original_cents', 'final_cents', 'currency', 'tax_treatment', 'tax_rate_basis_points', 'conditions', 'eta', 'shipping_option_code', 'carrier_code', 'contract_id', 'quote_source', 'price_breakdown', 'estimated_surcharges', 'lead_time_hours']));
                     $cleanRates[] = $rate;
                 }
@@ -115,7 +133,7 @@ class ShippingQuoteService
                 return $quotes;
             });
         } catch (LockTimeoutException) {
-            $this->fail('Una quotazione per questi dati è già in corso. Attendi e riprova.');
+            throw new ShippingFailure('SHIPPING_IN_PROGRESS');
         }
     }
 

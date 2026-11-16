@@ -2,12 +2,7 @@
     <h1>{{ $exchange ? 'Nuova controproposta' : 'Proponi uno scambio' }}</h1>
     <p class="my-4">Seleziona i prodotti di entrambi i lati e indica i valori unitari concordati delle merci. Trasporto, IVA e commissioni sono voci separate. La proposta richiederà due accettazioni del riepilogo e non riserva ancora quantità.</p>
     @if($errors->any())<x-alert variant="danger"><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></x-alert>@endif
-    <form x-ref="exchangeForm" x-data="{ busy:false, error:'', sides:{a:[],b:[]}, selected:{a:'',b:''},
-async quoteShipping() { this.busy=true; this.error=''; this.sides={a:[],b:[]};this.selected={a:'',b:''};
-try { const response=await fetch(@js($exchange ? route('retailer.exchanges.shipping.counter',$exchange) : route('retailer.exchanges.shipping')), {method:'POST',headers:{'Accept':'application/json','X-CSRF-TOKEN':@js(csrf_token())},body:new FormData(this.$refs.exchangeForm)});const data=await response.json(); if(!response.ok) throw new Error(Object.values(data.errors||{}).flat().join(' ')||'Quotazione non disponibile');this.sides=data.sides;
-if(!this.sides.a.length &amp;&amp; !this.sides.b.length) this.error='Nessuna tariffa disponibile: verifica modalità e dati di partenza.';
-} catch(e) {this.error=e.message;} finally {this.busy=false;}
-}}" @change="if(!$event.target.name.includes('shipping_quote_id')) {sides={a:[],b:[]};selected={a:'',b:''};}" method="POST" action="{{ $exchange ? route('retailer.exchanges.counter',$exchange) : route('retailer.exchanges.store') }}" class="space-y-6">
+    <form x-ref="exchangeForm" x-data="exchangeShipping({ endpoint: @js($exchange ? route('retailer.exchanges.shipping.counter',$exchange) : route('retailer.exchanges.shipping')), csrf: @js(csrf_token()) })" @input="if(!$event.target.name?.includes('shipping_quote_id')) resetShipping()" @change="if(!$event.target.name?.includes('shipping_quote_id')) resetShipping()" method="POST" action="{{ $exchange ? route('retailer.exchanges.counter',$exchange) : route('retailer.exchanges.store') }}" class="space-y-6">
         @csrf
         <input type="hidden" name="selection_mode" value="checkboxes">
         <input type="hidden" name="key" value="{{ old('key',$key) }}">
@@ -59,7 +54,7 @@ if(!this.sides.a.length &amp;&amp; !this.sides.b.length) this.error='Nessuna tar
                 </x-card>
             @endforeach
         </div>
-        @if(config('shipping.enabled'))<x-alert>Le due spedizioni sono quotate separatamente verso il profilo aziendale della controparte. I preventivi sono informativi fino alla verifica fiscale e di incasso. Il conguaglio merci resta separato.</x-alert><button type="button" class="btn btn-secondary min-h-11" :disabled="busy" @click="quoteShipping" x-text="busy ? 'Calcolo…' : 'Calcola i due trasporti'"></button><p role="alert" x-text="error"></p>@endif
+        @if(config('shipping.enabled'))<x-alert>Le due spedizioni sono quotate separatamente verso il profilo aziendale della controparte. I preventivi sono informativi fino alla verifica fiscale e di incasso. Il conguaglio merci resta separato.</x-alert><button type="button" class="btn btn-secondary min-h-11" :disabled="busy" @click="quoteShipping" x-text="busy ? 'Calcolo…' : 'Calcola i due trasporti'"></button><div role="alert" data-shipping-error class="mt-4 text-danger" x-show="error"><strong>Impossibile calcolare la spedizione</strong><p x-text="error"></p><p x-show="reference" x-text="'Riferimento assistenza: '+reference"></p><button type="button" class="btn btn-secondary min-h-11" x-show="retryable" :disabled="busy" @click="quoteShipping">Riprova</button></div><p x-show="!busy && !sides.a.length && !sides.b.length">Spese di spedizione non ancora calcolate.</p>@endif
         <label class="block"><span class="field-label">Note concordate (facoltative)</span><textarea class="field" name="notes" maxlength="2000" rows="3">{{ old('notes',$version?->notes) }}</textarea></label>
         <div class="flex flex-wrap gap-3"><x-button type="submit">{{ $exchange ? 'Crea nuova versione' : 'Invia proposta' }}</x-button><x-button variant="secondary" :href="$exchange ? route('retailer.exchanges.show',$exchange) : route('marketplace.show',$requested)">Torna indietro</x-button></div>
     </form>

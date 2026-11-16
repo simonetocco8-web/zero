@@ -9,6 +9,7 @@ use App\Models\Retailer;
 use App\Models\ShippingQuote;
 use App\Models\User;
 use App\Services\MarketplaceCart;
+use App\Services\Shipping\ShippingFailure;
 use App\Services\Shipping\ShippingQuoteService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -54,6 +55,10 @@ class ShippingQuoteController extends Controller
             })->values()->all();
         }
         $quotes = $service->quote($user, $origin, $lines, $destination);
+
+        if ($quotes === []) {
+            throw new ShippingFailure('SHIPPING_NO_RATES');
+        }
 
         return response()->json(['quotes' => array_map(fn ($q) => ['id' => $q->id, 'rate' => $q->rate, 'expires_at' => $q->expires_at->toIso8601String()], $quotes), 'informational' => ! config('shipping.checkout_verified')])->header('Cache-Control', 'private, no-store');
     }

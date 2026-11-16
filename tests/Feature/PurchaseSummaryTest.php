@@ -218,8 +218,8 @@ class PurchaseSummaryTest extends TestCase
         $this->add($p);
         $address = app(SaveCustomerAddress::class)->handle($this->buyer, $this->destination() + ['label' => 'Casa']);
         $this->postJson(route('shipping.quote'), ['retailer_id' => $p->retailer_id, 'address_id' => $address->id])->assertOk();
-        $this->postJson(route('shipping.quote'), ['retailer_id' => $p->retailer_id, 'address' => ['country_code' => 'IT']])->assertUnprocessable()->assertJsonPath('errors.recipient_name.0', 'Il campo destinatario è obbligatorio.')->assertDontSee('validation.required');
-        $this->postJson(route('shipping.quote'), ['item_id' => $p->id, 'address' => $this->destination()])->assertUnprocessable()->assertJsonPath('errors.quantity.0', 'Indica la quantità da spedire.');
+        $this->postJson(route('shipping.quote'), ['retailer_id' => $p->retailer_id, 'address' => ['country_code' => 'IT']])->assertUnprocessable()->assertJsonPath('error.code', 'SHIPPING_INCOMPLETE_ADDRESS')->assertJsonPath('error.fields.0', 'recipient_name')->assertDontSee('validation.required');
+        $this->postJson(route('shipping.quote'), ['item_id' => $p->id, 'address' => $this->destination()])->assertUnprocessable()->assertJsonPath('error.code', 'SHIPPING_INVALID_DATA')->assertJsonPath('error.fields.0', 'quantity');
         $this->postJson(route('shipping.quote'), ['retailer_id' => $p->retailer_id, 'address' => $this->destination(), 'price' => 1])->assertUnprocessable();
         $this->postJson(route('shipping.select'), ['shipping_quote_id' => (string) Str::uuid(), 'return_to' => 'https://example.test'])->assertUnprocessable();
         $other = User::factory()->create(['role' => 'customer']);

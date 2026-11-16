@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Contracts\ShippingQuoteProviderInterface;
 use App\Services\Shipping\SendcloudShippingProvider;
+use App\Services\Shipping\ShippingFailure;
+use GuzzleHttp\Exception\ConnectTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
@@ -130,14 +132,21 @@ class SendcloudShippingProviderTest extends TestCase
 
     public static function httpErrors(): array
     {
-        return [[400], [401], [403], [422], [429], [500], [503], [302]];
+        return [[400, 'SHIPPING_INVALID_DATA'], [401, 'SHIPPING_CONFIGURATION'], [403, 'SHIPPING_CONFIGURATION'], [422, 'SHIPPING_INVALID_DATA'], [429, 'SHIPPING_RATE_LIMITED'], [500, 'SHIPPING_UNAVAILABLE'], [503, 'SHIPPING_UNAVAILABLE'], [302, 'SHIPPING_UNAVAILABLE']];
     }
 
     #[DataProvider('httpErrors')]
-    public function test_http_errors_are_sanitized_and_not_retried(int $status): void
+    public function test_http_errors_are_sanitized_and_not_retried(int $status, string $code): void
     {
         Http::fake([SendcloudShippingProvider::ENDPOINT => Http::response(['message' => 'test-private private-unused'], $status)]);
-        $this->invalid(fn () => app(SendcloudShippingProvider::class)->quote($this->shipment()));
+        try {
+            app(SendcloudShippingProvider::class)->quote($this->shipment());
+            $this->fail('HTTP error accepted');
+        } catch (ShippingFailure $error) {
+            $this->assertSame($code, $error->shippingCode);
+            $this->assertSame($status, $error->diagnostics['http_status']);
+            $this->assertStringNotContainsString('test-private', $error->getMessage());
+        }
         Http::assertSentCount(1);
     }
 
@@ -157,6 +166,49 @@ class SendcloudShippingProviderTest extends TestCase
     {
         Http::fake(fn () => throw new ConnectionException('test-private private-unused'));
         $this->invalid(fn () => app(SendcloudShippingProvider::class)->quote($this->shipment()));
+    }
+
+    public function test_proven_curl_timeout_is_distinct_from_ambiguous_connection_failure(): void
+    {
+        $previous = new ConnectTimeoutException('secret', new \GuzzleHttp\Psr7\Request('POST', SendcloudShippingProvider::ENDPOINT));
+        Http::fake(fn () => throw new ConnectionException('secret', previous: $previous));
+        try {
+            app(SendcloudShippingProvider::class)->quote($this->shipment());
+            $this->fail('Timeout accepted');
+        } catch (ShippingFailure $error) {
+            $this->assertSame('SHIPPING_TIMEOUT', $error->shippingCode);
+        }
+    }
+
+    public function test_documented_error_source_identifies_only_destination_fields(): void
+    {
+        Http::fakeSequence()->push(['errors' => [['code' => 'required', 'source' => ['pointer' => '/to_address/city'], 'detail' => 'secret']]], 400)
+            ->push(['errors' => [['code' => 'invalid', 'source' => ['pointer' => '/from_address/postal_code']]]], 422);
+        foreach ([['SHIPPING_INCOMPLETE_ADDRESS', ['city']], ['SHIPPING_INVALID_DATA', []]] as [$code, $fields]) {
+            try {
+                app(SendcloudShippingProvider::class)->quote($this->shipment());
+                $this->fail('Provider validation accepted');
+            } catch (ShippingFailure $error) {
+                $this->assertSame($code, $error->shippingCode);
+                $this->assertSame($fields, $error->fields);
+            }
+        }
+    }
+
+    public function test_documented_option_service_failure_is_not_reported_as_wrong_address(): void
+    {
+        $fixture = $this->fixture();
+        foreach ($fixture['data'] as &$option) {
+            $option['quote_error'] = ['code' => 'carrier_api_unavailable'];
+        }
+        Http::fake([SendcloudShippingProvider::ENDPOINT => Http::response($fixture)]);
+        try {
+            app(SendcloudShippingProvider::class)->quote($this->shipment());
+            $this->fail('Unavailable carrier accepted');
+        } catch (ShippingFailure $error) {
+            $this->assertSame('SHIPPING_UNAVAILABLE', $error->shippingCode);
+            $this->assertSame([], $error->fields);
+        }
     }
 
     public function test_invalid_address_missing_credentials_or_too_many_parcels_prevent_http(): void
