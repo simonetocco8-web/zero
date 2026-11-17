@@ -7,6 +7,7 @@ use App\Models\InventoryItem;
 use App\Models\Retailer;
 use App\Services\ExchangeRules;
 use App\Services\MarketplaceCart;
+use App\Services\Shipping\ShippingFailure;
 use App\Services\Shipping\ShippingQuoteService;
 
 class ExchangeShippingQuoteController extends Controller
@@ -36,6 +37,10 @@ class ExchangeShippingQuoteController extends Controller
                 $lines[] = ['product' => $p, 'quantity_milliunits' => $q];
             }
             $quotes = $shipping->quote($request->user(), $origin, $lines, $destination, 'exchange:'.$data['key'].':'.$side);
+            if ($quotes === []) {
+                throw new ShippingFailure('SHIPPING_NO_RATES');
+            }
+
             $result[$side] = array_map(fn ($q) => ['id' => $q->id, 'rate' => $q->rate], $quotes);
         }
 

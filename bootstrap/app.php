@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\PrivatePageHeaders;
+use App\Services\Shipping\ShippingErrors;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,6 +24,18 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trimStrings(except: ['password', 'password_confirmation']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->report(function (Throwable $exception) {
+            if (ShippingErrors::handles(request())) {
+                return false;
+            }
+
+            return null;
+        });
+        $exceptions->render(function (Throwable $exception, Request $request) {
+            if (ShippingErrors::handles($request)) {
+                return ShippingErrors::response($exception);
+            }
+        });
         $exceptions->report(function (QueryException $exception) {
             if (! app()->environment('production')) {
                 return null;

@@ -2,8 +2,6 @@
 
 namespace App\Services\Shipping;
 
-use Illuminate\Validation\ValidationException;
-
 class ShippingParcelBuilder
 {
     public function build(iterable $lines): array
@@ -12,6 +10,14 @@ class ShippingParcelBuilder
         foreach ($lines as $line) {
             $p = $line['product'];
             $q = $line['quantity_milliunits'];
+            if (! is_int($p->weight_g) || $p->weight_g <= 0) {
+                throw new ShippingFailure('SHIPPING_MISSING_WEIGHT');
+            }
+            foreach (['length_mm', 'width_mm', 'height_mm'] as $dimension) {
+                if (! is_int($p->$dimension) || $p->$dimension <= 0) {
+                    throw new ShippingFailure('SHIPPING_MISSING_DIMENSIONS');
+                }
+            }
             $size = $p->only(['length_mm', 'width_mm', 'height_mm', 'weight_g']);
             if (count(array_filter($size, fn ($n) => is_int($n) && $n > 0)) !== 4 || ! $p->units_per_parcel_milliunits || $q <= 0) {
                 $this->fail();
@@ -44,6 +50,6 @@ class ShippingParcelBuilder
 
     private function fail(): never
     {
-        throw ValidationException::withMessages(['shipping' => 'Imballaggio insufficiente o quantità non compatibile con i colli dichiarati. Chiedi al rivenditore di completare i dati.']);
+        throw new ShippingFailure('SHIPPING_PACKAGING');
     }
 }

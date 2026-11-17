@@ -143,3 +143,7 @@ Nessuna migration nuova o storica modificata: i nuovi metadati usano il JSON `ra
 6. Rollback operativo: disabilitare `SHIPPING_QUOTES_ENABLED`, preservando dati e schema. Carrelli dinamici sospesi per shipping; ritiro ancora disponibile. Non riattivare Paccofacile né sostituire silenziosamente i prezzi con quelli manuali.
 
 Esiti e file modificati in [sendcloud-v3-validation.md](sendcloud-v3-validation.md). Nessun merge, deploy, acquisto etichetta o pagamento reale autorizzato/eseguito da questo lavoro.
+
+## Gestione uniforme degli errori — 16 novembre 2026
+
+Quotazioni prodotto/carrello/checkout e scambi adottano ora codici applicativi, messaggi italiani, riferimento assistenza e protezione dalle risposte obsolete. Contratto, analisi delle cause, tabella completa e test in [shipping-errors.md](shipping-errors.md). Le risposte riuscite conservano il formato esistente; nessuna tariffa quotabile è segnalata con `SHIPPING_NO_RATES` (422). Nessuna modifica alle regole tariffarie o all'attivazione dei pagamenti.
